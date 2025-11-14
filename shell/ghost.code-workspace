@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"name": "Beta",
+			"path": "../../../Documents/PlatformIO/Projects/Beta"
+		},
+		{
+			"name": "shell",
+			"path": "."
+		}
+	],
+	"settings": {}
+}
