@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import random
 import math
 import tqdm
-from tqdm.contrib.concurrent import process_map  # or thread_map
-from tqdm.contrib.concurrent import thread_map  # or thread_map
+from tqdm.contrib.concurrent import process_map
+from tqdm.contrib.concurrent import thread_map
 import multiprocessing as mp
 from collections import defaultdict
 """
@@ -15,6 +15,9 @@ We need:
 * Reward
 """
 class RandomPlayer:
+    def __init__(self, *args, **kwargs):
+        pass
+    
     def choose_action(self, possible_actions, board, player_value):
         return random.choice(possible_actions) 
     
@@ -22,11 +25,16 @@ class RandomPlayer:
         pass
 
 class RLPlayer:
-    def __init__(self):
-        self.state_values = defaultdict(int)
+    def __init__(self, state_values=None, lock=None):
         self.discount_factor = 0.9
         self.experimentation_rate = 0.8
         self.games = 0
+        self.lock = lock
+        if state_values:
+            self.state_values = state_values
+        else:
+            self.state_values = defaultdict(int)
+        
 
     def choose_action(self, possible_actions, board, player_value):
         if np.random.uniform(0, 1) <= self.experimentation_rate * 1/(self.games+1):
@@ -47,12 +55,21 @@ class RLPlayer:
 
     def inform(self, game_sequence, reward):
         self.games += 1
-        for state in reversed(game_sequence):
-            self.state_values[state] = self.state_values[state] + self.discount_factor*(reward - self.state_values[state])
-            reward = self.state_values[state]
+        if self.lock is not None:
+            for state in reversed(game_sequence):
+                with self.lock:
+                    self.state_values[state] = self.state_values[state] + self.discount_factor*(reward - self.state_values[state])
+                    reward = self.state_values[state]
+        else:
+            for state in reversed(game_sequence):
+                self.state_values[state] = self.state_values[state] + self.discount_factor*(reward - self.state_values[state])
+                reward = self.state_values[state]
 
 
 class HumanPlayer:
+    def __init__(self, *args, **kwargs):
+        pass
+
     def choose_action(self, possible_actions, board, player_value):
         while True:
             try:
@@ -177,6 +194,7 @@ class Board:
 
 def display(p1, p1_results, p2, p2_results):
     # Create DataFrame for analysis
+    rounds = len(p1_results)
     df = pd.DataFrame({
         'round': range(rounds),
         'p1_wins': p1_results,
@@ -222,8 +240,6 @@ def display(p1, p1_results, p2, p2_results):
     plt.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.show()
-    
     # Print bucketed results
     bucket_size = max(1, rounds // 50)
     print(f"\nBucketed Results (bucket size: {bucket_size}):")
@@ -234,6 +250,9 @@ def display(p1, p1_results, p2, p2_results):
         p1_rate = p1_bucket / bucket_size
         p2_rate = p2_bucket / bucket_size
         print(f"Bucket {i//bucket_size + 1}: P1 = {p1_rate:.2%}, P2 = {p2_rate:.2%}")
+    input("Press enter to see results")
+    plt.show()
+    
 
 def play_game_chunk(args):
     """Play a chunk of games and return results"""
@@ -259,6 +278,19 @@ def play_game_chunk(args):
     
     return p1_results, p2_results
 
+def run_human(rounds):
+    p1_results = []
+    p2_results = []
+    while True:
+        game = Game(p1, p2)
+        p1_chunk, p2_chunk = play_game_chunk((0, 1, p1, p2))
+        p1_results.extend(p1_chunk)
+        p2_results.extend(p2_chunk)
+        continue_game = input("Continue playing? (y/n): ")
+        if continue_game.lower() != 'y':
+            break
+
+    return p1_results, p2_results
 
 def run_single_threaded(rounds):
     p1_results = []
@@ -328,45 +360,51 @@ def run_multi_process(rounds):
 
 
 if __name__ == '__main__':
+    execution_map = {
+        1: run_single_threaded,
+        2: run_multi_threaded,
+        3: run_multi_process,
+        4: run_human
+    }
+
     print("Choose player types:")
     print("1. Human")
     print("2. Random")
     print("3. RL")
     
-    choice1 = input("Enter choice for Player 1 (1-3): ")
-    choice2 = input("Enter choice for Player 2 (1-3): ")
+    player1_choice = input("Enter choice for Player 1 (1-3): ")
+    player2_choice = input("Enter choice for Player 2 (1-3): ")
+    manager = mp.Manager()
+    lock = manager.Lock()
+    rl_state = manager.dict()
+
+    if player1_choice != 1 and player2_choice != 1:
+        rounds = int(input("How many rounds do you want? "))
+        mechanism = int(input("1 for single-thread, 2 for multi-threaded, 3 for multi-process: "))
+        # Create managed dictionary for RL player state
+    else:
+        mechanism = 4
+        rounds = -1
     
-    player_types = [HumanPlayer, RandomPlayer, RLPlayer]
-    
-    if choice1 == "1":
-        p1 = HumanPlayer()
-    elif choice1 == "2":
-        p1 = RandomPlayer()
-    elif choice1 == "3":
-        p1 = RLPlayer()
+    if player1_choice == "1":
+        p1 = HumanPlayer(state_values=rl_state, lock=lock)
+    elif player1_choice == "2":
+        p1 = RandomPlayer(state_values=rl_state, lock=lock)
+    elif player1_choice == "3":
+        p1 = RLPlayer(state_values=rl_state, lock=lock)
     else:
         print("Invalid choice for Player 1, using Random")
-        p1 = RandomPlayer()
+        p1 = RandomPlayer(state_values=rl_state, lock=lock)
     
-    if choice2 == "1":
-        p2 = HumanPlayer()
-    elif choice2 == "2":
-        p2 = RandomPlayer()
-    elif choice2 == "3":
-        p2 = RLPlayer()
+    if player2_choice == "1":
+        p2 = HumanPlayer(state_values=rl_state, lock=lock)
+    elif player2_choice == "2":
+        p2 = RandomPlayer(state_values=rl_state, lock=lock)
+    elif player2_choice == "3":
+        p2 = RLPlayer(state_values=rl_state, lock=lock)
     else:
         print("Invalid choice for Player 2, using Random")
-        p2 = RandomPlayer()
-    
-    rounds = int(input("How many rounds? "))
-
-    mechanism = int(input("1 for single-thread, 2 for multi-thread, 3 for multi-process: "))
-
-    execution_map = {
-        1: run_single_threaded,
-        2: run_multi_threaded,
-        3: run_multi_process
-    }
+        p2 = RandomPlayer(state_values=rl_state, lock=lock)
     
     p1_results, p2_results = execution_map[mechanism](rounds)
 
