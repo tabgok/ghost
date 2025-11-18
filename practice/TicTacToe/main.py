@@ -14,6 +14,7 @@ We need:
 * Action
 * Reward
 """
+
 class RandomPlayer:
     def __init__(self, *args, **kwargs):
         pass
@@ -25,6 +26,7 @@ class RandomPlayer:
         pass
 
 class RLPlayer:
+    default_filename = "rl_player_state.pkl"
     def __init__(self, state_values=None, lock=None):
         self.discount_factor = 0.9
         self.experimentation_rate = 0.8
@@ -391,6 +393,15 @@ if __name__ == '__main__':
     elif player1_choice == "2":
         p1 = RandomPlayer(state_values=rl_state, lock=lock)
     elif player1_choice == "3":
+        load_from_file = input("Load RL state from file? (y/n): ").lower() == 'y'
+        if load_from_file:
+            import pickle
+            filename = input(f"Enter filename to load RL state (default: {RLPlayer.default_filename}): ") or RLPlayer.default_filename
+            with open(filename, 'rb') as f:
+                loaded_state = pickle.load(f)
+            for key, value in loaded_state.items():
+                rl_state[key] = value
+            print(f"RL state loaded from {filename}")
         p1 = RLPlayer(state_values=rl_state, lock=lock)
     else:
         print("Invalid choice for Player 1, using Random")
@@ -405,7 +416,15 @@ if __name__ == '__main__':
     else:
         print("Invalid choice for Player 2, using Random")
         p2 = RandomPlayer(state_values=rl_state, lock=lock)
-    
+
     p1_results, p2_results = execution_map[mechanism](rounds)
 
     display(p1, p1_results, p2, p2_results)
+
+    save = bool(input("Would you like to save the RL state? (y/n): ").lower() == 'y')
+    if save:
+        import pickle
+        filename = input(f"Enter filename to save RL state (default: {RLPlayer.default_filename}): ") or RLPlayer.default_filename
+        with open(filename, 'wb') as f:
+            pickle.dump(dict(rl_state), f)
+        print(f"RL state saved to {filename}")
