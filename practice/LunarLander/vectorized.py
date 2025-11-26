@@ -60,8 +60,6 @@ class QAgent():
     
     def update(self, reward, last_observation, last_action, current_observation, done):
         self.updates += 1
-        if self.updates % 100000 == 0:
-            print(len(self.state_action))
         last_state_space = self.discretize(last_observation)
         current_state_space = self.discretize(current_observation)
         state_action_space = (last_state_space, last_action)
@@ -96,20 +94,22 @@ def run(profile_enabled: bool = False):
     num_envs = 16  # bump this to use more CPU cores
     rewards = []
 
-    # Vectorized environment for parallel rollout.
-    def _make_env():
-        return gym.make(
-            "LunarLander-v3",
-            continuous=False,
-            gravity=-10.0,
-            enable_wind=False,
-            wind_power=15.0,
-            turbulence_power=1.5,
-            render_mode=None,
-        )
+    # Environment factory so we can reuse it for training and the demo run.
+    def make_env(render_mode=None):
+        def _thunk():
+            return gym.make(
+                "LunarLander-v3",
+                continuous=False,
+                gravity=-10.0,
+                enable_wind=False,
+                wind_power=15.0,
+                turbulence_power=1.5,
+                render_mode=render_mode,
+            )
+        return _thunk
 
     # Async to leverage multiple cores.
-    env = gym.vector.AsyncVectorEnv([_make_env for _ in range(num_envs)])
+    env = gym.vector.AsyncVectorEnv([make_env() for _ in range(num_envs)])
     agent = QAgent(env.single_observation_space, env.single_action_space)
 
     obs, info = env.reset()
@@ -166,6 +166,22 @@ def run(profile_enabled: bool = False):
         rollout()
 
     env.close()
+
+    # Render a single evaluation episode with the learned policy.
+    demo_env = make_env(render_mode="human")()
+    demo_obs, _ = demo_env.reset()
+    done = False
+    demo_return = 0.0
+    # Greedy run for the demo.
+    agent.exploration_rate = 0.0
+    while not done:
+        action = agent.select_action(demo_env.action_space, demo_obs)
+        demo_obs, reward, terminated, truncated, _ = demo_env.step(action)
+        demo_return += reward
+        done = terminated or truncated
+    print(f"Demo episode return: {demo_return}")
+    demo_env.close()
+
     display_learning(rewards)
 
 

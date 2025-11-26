@@ -10,13 +10,14 @@ import pstats
 import numba as nb
 
 class RandomAgent:
-    def __init__(self, observation_space=None):
-        pass
+    def __init__(self, args, kwargs):
+        self.exploration_rate = 0
+        self.state_action = dict()
     
     def select_action(self, action_space, observation):
         return action_space.sample()
 
-    def update(self, reward):
+    def update(self, reward, last_observation, last_action, current_observation, done):
         pass
 
 rng = np.random.default_rng()
@@ -87,14 +88,14 @@ class QAgent():
 
 
 def main():
-    episodes = 10000000
-    display_count = 0
+    episodes = 1000
+    display_count = 10
 
     render_mode = None
     env = gym.make("LunarLander-v3", continuous=False, gravity=-10.0,
             enable_wind=False, wind_power=15.0, turbulence_power=1.5, render_mode=render_mode)
     rewards = []
-    agent = QAgent(env.observation_space, env.action_space)
+    agent = RandomAgent(env.observation_space, env.action_space)
     last_exploration_rate = 0
     bucket_reward = 0
 
