@@ -124,9 +124,9 @@ def run(
     model_path: Path = Path("q_model.pkl"),
     fresh: bool = False,
     eval_only: bool = False,
+    total_episodes: int = 50000,
+    num_envs: int = 16,
 ):
-    total_episodes = 50000  # keep small for quick runs; raise as needed
-    num_envs = 16  # bump this to use more CPU cores
     rewards = []
 
     # Environment factory so we can reuse it for training and the demo run.
@@ -257,10 +257,14 @@ if __name__ == "__main__":
     parser.add_argument("--model-path", default="q_model.pkl", help="Path to load/save the Q-table")
     parser.add_argument("--fresh", action="store_true", help="Start with a fresh model instead of loading")
     parser.add_argument("--eval-only", action="store_true", help="Skip training and only run a rendered demo with the loaded agent")
+    parser.add_argument("--episodes", type=int, default=50000, help="Number of training episodes to run")
+    parser.add_argument("--num-envs", type=int, default=16, help="Number of parallel environments")
     args = parser.parse_args()
     run(
         profile_enabled=args.profile,
         model_path=Path(args.model_path),
         fresh=args.fresh,
         eval_only=args.eval_only,
+        total_episodes=args.episodes,
+        num_envs=args.num_envs,
     )
