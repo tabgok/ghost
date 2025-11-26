@@ -9,6 +9,8 @@ import cProfile
 import pstats
 import argparse
 import numba as nb
+import pickle
+from pathlib import Path
 
 class RandomAgent:
     def __init__(self, observation_space=None):
@@ -88,8 +90,41 @@ class QAgent():
         #return tuple(np.searchsorted(self.bin_edges[i], obs_arr[i], side='right') for i in range(self.dimensions))
         return tuple(discretize_jit(obs_arr, self.bin_edges))
 
+    def save(self, path: Path):
+        data = {
+            "state_action": dict(self.state_action),
+            "exploration_rate": self.exploration_rate,
+            "step_size": self.step_size,
+            "exploration_rate_min": self.exploration_rate_min,
+            "exploration_rate_decay": self.exploration_rate_decay,
+            "discount_factor": self.discount_factor,
+            "bins": self.bin_edges,
+        }
+        with path.open("wb") as f:
+            pickle.dump(data, f)
 
-def run(profile_enabled: bool = False):
+    def load(self, path: Path):
+        if not path.exists():
+            return
+        with path.open("rb") as f:
+            data = pickle.load(f)
+        self.state_action = defaultdict(float, data.get("state_action", {}))
+        self.exploration_rate = data.get("exploration_rate", self.exploration_rate)
+        self.step_size = data.get("step_size", self.step_size)
+        self.exploration_rate_min = data.get("exploration_rate_min", self.exploration_rate_min)
+        self.exploration_rate_decay = data.get("exploration_rate_decay", self.exploration_rate_decay)
+        self.discount_factor = data.get("discount_factor", self.discount_factor)
+        bins_loaded = data.get("bins")
+        if bins_loaded is not None:
+            self.bin_edges = bins_loaded
+
+
+def run(
+    profile_enabled: bool = False,
+    model_path: Path = Path("q_model.pkl"),
+    fresh: bool = False,
+    eval_only: bool = False,
+):
     total_episodes = 50000  # keep small for quick runs; raise as needed
     num_envs = 16  # bump this to use more CPU cores
     rewards = []
@@ -111,6 +146,8 @@ def run(profile_enabled: bool = False):
     # Async to leverage multiple cores.
     env = gym.vector.AsyncVectorEnv([make_env() for _ in range(num_envs)])
     agent = QAgent(env.single_observation_space, env.single_action_space)
+    if not fresh and model_path.exists():
+        agent.load(model_path)
 
     obs, info = env.reset()
     per_env_returns = np.zeros(num_envs, dtype=np.float64)
@@ -157,13 +194,14 @@ def run(profile_enabled: bool = False):
 
                 obs = next_obs
 
-    if profile_enabled:
-        with cProfile.Profile() as pr:
+    if not eval_only:
+        if profile_enabled:
+            with cProfile.Profile() as pr:
+                rollout()
+            stats = pstats.Stats(pr)
+            stats.sort_stats("cumtime").print_stats(40)
+        else:
             rollout()
-        stats = pstats.Stats(pr)
-        stats.sort_stats("cumtime").print_stats(40)
-    else:
-        rollout()
 
     env.close()
 
@@ -182,7 +220,12 @@ def run(profile_enabled: bool = False):
     print(f"Demo episode return: {demo_return}")
     demo_env.close()
 
-    display_learning(rewards)
+    # Persist the learned table.
+    if not eval_only:
+        agent.save(model_path)
+
+    if not eval_only:
+        display_learning(rewards)
 
 
 def display_learning(rewards):
@@ -211,5 +254,13 @@ def display_learning(rewards):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--profile", action="store_true", help="Enable cProfile around the episode loop")
+    parser.add_argument("--model-path", default="q_model.pkl", help="Path to load/save the Q-table")
+    parser.add_argument("--fresh", action="store_true", help="Start with a fresh model instead of loading")
+    parser.add_argument("--eval-only", action="store_true", help="Skip training and only run a rendered demo with the loaded agent")
     args = parser.parse_args()
-    run(profile_enabled=args.profile)
+    run(
+        profile_enabled=args.profile,
+        model_path=Path(args.model_path),
+        fresh=args.fresh,
+        eval_only=args.eval_only,
+    )
