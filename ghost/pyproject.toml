@@ -20,4 +20,5 @@ build-backend = "hatchling.build"
 packages = [
     "src/cli",
     "src/agent",
+    "src/envs",
 ]
