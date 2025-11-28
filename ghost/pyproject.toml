@@ -9,6 +9,7 @@ dependencies = [
     "pyyaml",
     "gymnasium",
     "numpy",
+    "pytest",
 ]
 
 [project.scripts]
