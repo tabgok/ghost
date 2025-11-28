@@ -87,6 +87,7 @@ class TicTacToeEnv(gym.Env):
         self._board = np.zeros((3, 3), dtype=np.int8)
         self._done = False
         self._win_line: Optional[List[tuple[int, int]]] = None
+        self._winner: Optional[int] = None
         if self.render_mode not in self.metadata["render_modes"]:
             self.render_mode = None
         self._window: tk.Tk | None = None
@@ -101,6 +102,7 @@ class TicTacToeEnv(gym.Env):
         self._board.fill(0)
         self._done = False
         self._win_line = None
+        self._winner = None
         return self._board.copy(), {}
 
     def step(self, action: int, marker: int | None = None) -> Tuple[np.ndarray, float, bool, bool, dict]:
@@ -119,6 +121,7 @@ class TicTacToeEnv(gym.Env):
             reward = -0.5
             terminated = True
             self._done = True
+            self._winner = opponent_marker
             return self._board.copy(), reward, terminated, truncated, {}
 
         # Agent move
@@ -132,6 +135,7 @@ class TicTacToeEnv(gym.Env):
             terminated = True
             self._done = True
             self._win_line = win_cells
+            self._winner = marker
             return self._board.copy(), reward, terminated, truncated, {}
 
         if not (self._board == 0).any():
@@ -155,6 +159,7 @@ class TicTacToeEnv(gym.Env):
             terminated = True
             self._done = True
             self._win_line = win_cells
+            self._winner = opponent_marker
             return self._board.copy(), reward, terminated, truncated, {}
 
         if not (self._board == 0).any():
@@ -162,6 +167,10 @@ class TicTacToeEnv(gym.Env):
             self._done = True
 
         return self._board.copy(), reward, terminated, truncated, {}
+
+    @property
+    def winner(self) -> Optional[int]:
+        return self._winner
 
     def render(self):
         frame = self._render_frame(self._win_line)
