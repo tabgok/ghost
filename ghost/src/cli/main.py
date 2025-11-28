@@ -43,7 +43,12 @@ def list_agents() -> None:
 
     click.echo("Agents:")
     for name in agents:
-        click.echo(f"- {name}")
+        cfg = _read_agent_config(name)
+        click.echo(
+            f"- {name}: action={cfg.get('action_policy')}, "
+            f"exploration={cfg.get('exploration_policy', {}).get('type')}, "
+            f"learning={cfg.get('learning_policy', {}).get('type')}"
+        )
 
 
 @agent.command("create", help="Create a new agent with action, exploration, and learning policies.")
@@ -135,6 +140,33 @@ def create_agent(
     click.echo(
         f"Created agent '{name}' with action policy '{action_policy}' at {path}"
     )
+
+
+@agent.command("rm", help="Delete an agent by name.")
+@click.argument("name", required=False)
+def delete_agent(name: str | None) -> None:
+    existing = _list_agent_names()
+    if not existing:
+        raise click.ClickException("No agents to delete.")
+
+    if not name:
+        click.echo("Available agents:")
+        for agent_name in existing:
+            cfg = _read_agent_config(agent_name)
+            click.echo(
+                f"- {agent_name}: action={cfg.get('action_policy')}, "
+                f"exploration={cfg.get('exploration_policy', {}).get('type')}, "
+                f"learning={cfg.get('learning_policy', {}).get('type')}"
+            )
+        name = click.prompt(
+            "Agent to delete", type=click.Choice(existing)
+        )
+
+    path = AGENTS_DIR / f"{name}{AGENT_EXT}"
+    if not path.exists():
+        raise click.ClickException(f"Agent '{name}' not found at {path}")
+    path.unlink()
+    click.echo(f"Deleted agent '{name}'")
 
 
 def main() -> None:
@@ -269,9 +301,13 @@ def _prompt_for_agent(label: str) -> str:
 def _load_action_policy_from_file(agent_name: str):
     if agent_name.lower() == "human":
         return HumanPolicy()
+    agent_cfg = _read_agent_config(agent_name)
+    return _load_action_policy(agent_cfg.get("action_policy", DEFAULT_ACTION_POLICY))
+
+
+def _read_agent_config(agent_name: str) -> dict:
     agent_path = AGENTS_DIR / f"{agent_name}{AGENT_EXT}"
     if not agent_path.exists():
         raise click.ClickException(f"Agent '{agent_name}' not found at {agent_path}")
     with agent_path.open(encoding="utf-8") as fp:
-        agent_cfg = yaml.safe_load(fp) or {}
-    return _load_action_policy(agent_cfg.get("action_policy", DEFAULT_ACTION_POLICY))
+        return yaml.safe_load(fp) or {}
