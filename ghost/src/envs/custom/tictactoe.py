@@ -26,7 +26,7 @@ class TicTacToeEnv(gym.Env):
 
     opponent_random: bool = True
 
-    metadata = {"render_modes": []}
+    metadata = {"render_modes": ["human"]}
 
     def __post_init__(self) -> None:
         self.observation_space = spaces.Box(low=0, high=2, shape=(3, 3), dtype=np.int8)
@@ -90,3 +90,10 @@ class TicTacToeEnv(gym.Env):
             self._done = True
 
         return self._board.copy(), reward, terminated, truncated, {}
+
+    def render(self):
+        board_str = "\n".join(
+            " ".join({0: ".", 1: "X", 2: "O"}[cell] for cell in row)
+            for row in self._board
+        )
+        print(board_str)

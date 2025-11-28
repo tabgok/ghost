@@ -159,7 +159,15 @@ def main() -> None:
     show_default=True,
     help="Number of episodes to run.",
 )
-def run(agent_name: str | None, env_name: str | None, episodes: int) -> None:
+@click.option(
+    "--render",
+    "render_mode",
+    type=click.Choice(["human", "none"]),
+    default="human",
+    show_default=True,
+    help="Rendering mode during evaluation.",
+)
+def run(agent_name: str | None, env_name: str | None, episodes: int, render_mode: str) -> None:
     if not agent_name:
         existing = _list_agent_names()
         default_agent = existing[0] if existing else None
@@ -181,7 +189,7 @@ def run(agent_name: str | None, env_name: str | None, episodes: int) -> None:
     with agent_path.open(encoding="utf-8") as fp:
         agent_cfg = yaml.safe_load(fp) or {}
 
-    env = _make_env(env_name)
+    env = _make_env(env_name, render_mode)
     policy = _load_action_policy(agent_cfg.get("action_policy", DEFAULT_ACTION_POLICY))
 
     for ep in range(1, episodes + 1):
@@ -196,19 +204,21 @@ def run(agent_name: str | None, env_name: str | None, episodes: int) -> None:
             obs, reward, terminated, truncated, _info = env.step(action)
             total_reward += reward
             steps += 1
+            if render_mode == "human" and hasattr(env, "render"):
+                env.render()
 
         click.echo(
             f"Episode {ep}/{episodes}: steps={steps}, total_reward={total_reward:.3f}"
         )
 
 
-def _make_env(env_name: str):
+def _make_env(env_name: str, render_mode: str):
     if env_name == "tictactoe":
         return TicTacToeEnv()
     if env_name == "cartpole":
-        return gym.make("CartPole-v1")
+        return gym.make("CartPole-v1", render_mode=None if render_mode == "none" else render_mode)
     if env_name == "lunar_lander":
-        return gym.make("LunarLander-v2")
+        return gym.make("LunarLander-v2", render_mode=None if render_mode == "none" else render_mode)
     raise click.ClickException(f"Unknown environment '{env_name}'")
 
 
