@@ -51,6 +51,20 @@ class _AvailableMovesSpace:
         empties = np.argwhere(self.env._board == 0)
         return [int(r * 3 + c) for r, c in empties]
 
+    @property
+    def human_options(self) -> dict:
+        """Return data useful for human-readable prompts."""
+        symbols = {0: ".", 1: "X", 2: "O"}
+        rows = []
+        for r in range(3):
+            row = []
+            for c in range(3):
+                idx = r * 3 + c
+                cell = int(self.env._board[r, c])
+                row.append(str(idx) if cell == 0 else symbols.get(cell, "?"))
+            rows.append(" ".join(row))
+        return {"board": rows, "options": self.available_actions()}
+
 
 @dataclass
 class TicTacToeEnv(gym.Env):
