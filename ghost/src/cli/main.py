@@ -162,7 +162,7 @@ def main() -> None:
 @click.option(
     "--render",
     "render_mode",
-    type=click.Choice(["human", "none"]),
+    type=click.Choice(["human", "none", "rgb_array"]),
     default="human",
     show_default=True,
     help="Rendering mode during evaluation.",
@@ -214,7 +214,8 @@ def run(agent_name: str | None, env_name: str | None, episodes: int, render_mode
 
 def _make_env(env_name: str, render_mode: str):
     if env_name == "tictactoe":
-        return TicTacToeEnv()
+        mode = None if render_mode == "none" else render_mode
+        return TicTacToeEnv(render_mode=mode)
     if env_name == "cartpole":
         return gym.make("CartPole-v1", render_mode=None if render_mode == "none" else render_mode)
     if env_name == "lunar_lander":
