@@ -4,12 +4,18 @@ from pathlib import Path
 import yaml
 import click
 
+import gymnasium as gym
+
+from agent.policies.action.random import RandomPolicy
+from envs.custom.tictactoe import TicTacToeEnv
+
 BASE_DIR = Path.home() / ".ghost"
 AGENTS_DIR = BASE_DIR / "agents"
 AGENT_EXT = ".yaml"
 DEFAULT_ACTION_POLICY = "random"
 DEFAULT_EXPLORATION_POLICY = "epsilon_greedy"
 DEFAULT_LEARNING_POLICY = "noop"
+AVAILABLE_ENVS = ["tictactoe", "cartpole", "lunar_lander"]
 
 
 @click.group(
@@ -27,11 +33,7 @@ def agent() -> None:
 
 @agent.command("ls", help="List available agents.")
 def list_agents() -> None:
-    if not AGENTS_DIR.exists():
-        click.echo("No agents found.")
-        return
-
-    agents = sorted(p.stem for p in AGENTS_DIR.glob(f"*{AGENT_EXT}") if p.is_file())
+    agents = _list_agent_names()
     if not agents:
         click.echo("No agents found.")
         return
@@ -134,3 +136,89 @@ def create_agent(
 
 def main() -> None:
     ghost(prog_name="ghost")
+
+
+@ghost.command("run", help="Run an agent in an environment.")
+@click.option(
+    "--agent",
+    "agent_name",
+    required=False,
+    help="Name of the agent to run (will prompt if omitted).",
+)
+@click.option(
+    "--env",
+    "env_name",
+    type=click.Choice(AVAILABLE_ENVS),
+    required=False,
+    help="Environment to run (will prompt if omitted).",
+)
+@click.option(
+    "--episodes",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Number of episodes to run.",
+)
+def run(agent_name: str | None, env_name: str | None, episodes: int) -> None:
+    if not agent_name:
+        existing = _list_agent_names()
+        default_agent = existing[0] if existing else None
+        agent_name = click.prompt(
+            "Agent name",
+            type=click.Choice(existing) if existing else str,
+            default=default_agent,
+            show_default=bool(default_agent),
+        )
+    if not env_name:
+        env_name = click.prompt(
+            "Environment", type=click.Choice(AVAILABLE_ENVS), default="tictactoe"
+        )
+
+    agent_path = AGENTS_DIR / f"{agent_name}{AGENT_EXT}"
+    if not agent_path.exists():
+        raise click.ClickException(f"Agent '{agent_name}' not found at {agent_path}")
+
+    with agent_path.open(encoding="utf-8") as fp:
+        agent_cfg = yaml.safe_load(fp) or {}
+
+    env = _make_env(env_name)
+    policy = _load_action_policy(agent_cfg.get("action_policy", DEFAULT_ACTION_POLICY))
+
+    for ep in range(1, episodes + 1):
+        obs, _ = env.reset()
+        terminated = False
+        truncated = False
+        total_reward = 0.0
+        steps = 0
+
+        while not (terminated or truncated):
+            action = policy.act(env.action_space, obs)
+            obs, reward, terminated, truncated, _info = env.step(action)
+            total_reward += reward
+            steps += 1
+
+        click.echo(
+            f"Episode {ep}/{episodes}: steps={steps}, total_reward={total_reward:.3f}"
+        )
+
+
+def _make_env(env_name: str):
+    if env_name == "tictactoe":
+        return TicTacToeEnv()
+    if env_name == "cartpole":
+        return gym.make("CartPole-v1")
+    if env_name == "lunar_lander":
+        return gym.make("LunarLander-v2")
+    raise click.ClickException(f"Unknown environment '{env_name}'")
+
+
+def _load_action_policy(name: str):
+    if name == "random":
+        return RandomPolicy()
+    raise click.ClickException(f"Unsupported action policy '{name}'")
+
+
+def _list_agent_names() -> list[str]:
+    if not AGENTS_DIR.exists():
+        return []
+    return sorted(p.stem for p in AGENTS_DIR.glob(f"*{AGENT_EXT}") if p.is_file())
