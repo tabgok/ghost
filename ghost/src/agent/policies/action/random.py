@@ -1,9 +1,10 @@
-from agent.policy.action_policy import ActionPolicy
+from __future__ import annotations
+
+import random
+from typing import Any
+
+from agent.policies.action.policy import ActionPolicy
 
 class RandomPolicy(ActionPolicy):
-    def __init__(self) -> None:
-        pass
-
-    def act(self, action_space, observation):
-        import random
+    def act(self, action_space: Any, observation: Any) -> Any:
         return random.choice(action_space)
