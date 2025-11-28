@@ -8,6 +8,7 @@ import time
 import gymnasium as gym
 
 from agent.policies.action.random import RandomPolicy
+from agent.policies.action.human import HumanPolicy
 from envs.custom.tictactoe import TicTacToeEnv
 
 BASE_DIR = Path.home() / ".ghost"
@@ -17,6 +18,7 @@ DEFAULT_ACTION_POLICY = "random"
 DEFAULT_EXPLORATION_POLICY = "epsilon_greedy"
 DEFAULT_LEARNING_POLICY = "noop"
 AVAILABLE_ENVS = ["tictactoe", "cartpole", "lunar_lander"]
+ACTIONS = [DEFAULT_ACTION_POLICY, "human"]
 
 
 @click.group(
@@ -49,7 +51,7 @@ def list_agents() -> None:
 @click.option(
     "--action-policy",
     "action_policy",
-    type=click.Choice([DEFAULT_ACTION_POLICY]),
+    type=click.Choice(ACTIONS),
     default=DEFAULT_ACTION_POLICY,
     show_default=True,
     prompt="Action policy",
@@ -139,12 +141,18 @@ def main() -> None:
     ghost(prog_name="ghost")
 
 
-@ghost.command("run", help="Run an agent in an environment.")
+@ghost.command("run", help="Run agents in an environment.")
 @click.option(
-    "--agent",
-    "agent_name",
+    "--agent-a",
+    "agent_a",
     required=False,
-    help="Name of the agent to run (will prompt if omitted).",
+    help="Name of the first agent (will prompt if omitted).",
+)
+@click.option(
+    "--agent-b",
+    "agent_b",
+    required=False,
+    help="Name of the second agent (will prompt if omitted).",
 )
 @click.option(
     "--env",
@@ -168,57 +176,52 @@ def main() -> None:
     show_default=True,
     help="Rendering mode during evaluation.",
 )
-def run(agent_name: str | None, env_name: str | None, episodes: int, render_mode: str) -> None:
-    if not agent_name:
-        existing = _list_agent_names()
-        default_agent = existing[0] if existing else None
-        agent_name = click.prompt(
-            "Agent name",
-            type=click.Choice(existing) if existing else str,
-            default=default_agent,
-            show_default=bool(default_agent),
-        )
+def run(
+    agent_a: str | None,
+    agent_b: str | None,
+    env_name: str | None,
+    episodes: int,
+    render_mode: str,
+) -> None:
+    if not agent_a:
+        agent_a = _prompt_for_agent("Agent A")
+    if not agent_b:
+        agent_b = _prompt_for_agent("Agent B")
     if not env_name:
         env_name = click.prompt(
             "Environment", type=click.Choice(AVAILABLE_ENVS), default="tictactoe"
         )
 
-    agent_path = AGENTS_DIR / f"{agent_name}{AGENT_EXT}"
-    if not agent_path.exists():
-        raise click.ClickException(f"Agent '{agent_name}' not found at {agent_path}")
-
-    with agent_path.open(encoding="utf-8") as fp:
-        agent_cfg = yaml.safe_load(fp) or {}
-
-    env = _make_env(env_name, render_mode)
-    policy = _load_action_policy(agent_cfg.get("action_policy", DEFAULT_ACTION_POLICY))
+    env = _make_env(env_name, render_mode, two_players=True)
+    policy_a = _load_action_policy_from_file(agent_a)
+    policy_b = _load_action_policy_from_file(agent_b)
 
     for ep in range(1, episodes + 1):
         obs, _ = env.reset()
         terminated = False
         truncated = False
-        total_reward = 0.0
         steps = 0
+        current = 0  # 0 for agent A (marker 1), 1 for agent B (marker 2)
 
         while not (terminated or truncated):
+            policy = policy_a if current == 0 else policy_b
+            marker = 1 if current == 0 else 2
             action = policy.act(env.action_space, obs)
-            obs, reward, terminated, truncated, _info = env.step(action)
-            total_reward += reward
+            obs, reward, terminated, truncated, _info = env.step(action, marker=marker)
             steps += 1
+            current = 1 - current
             if render_mode == "human" and hasattr(env, "render"):
                 env.render()
 
-        click.echo(
-            f"Episode {ep}/{episodes}: steps={steps}, total_reward={total_reward:.3f}"
-        )
+        click.echo(f"Episode {ep}/{episodes}: steps={steps}")
         if render_mode == "human":
             time.sleep(2.0)
 
 
-def _make_env(env_name: str, render_mode: str):
+def _make_env(env_name: str, render_mode: str, two_players: bool = False):
     if env_name == "tictactoe":
         mode = None if render_mode == "none" else render_mode
-        return TicTacToeEnv(render_mode=mode)
+        return TicTacToeEnv(render_mode=mode, opponent_random=not two_players)
     if env_name == "cartpole":
         return gym.make("CartPole-v1", render_mode=None if render_mode == "none" else render_mode)
     if env_name == "lunar_lander":
@@ -229,6 +232,8 @@ def _make_env(env_name: str, render_mode: str):
 def _load_action_policy(name: str):
     if name == "random":
         return RandomPolicy()
+    if name == "human":
+        return HumanPolicy()
     raise click.ClickException(f"Unsupported action policy '{name}'")
 
 
@@ -236,3 +241,26 @@ def _list_agent_names() -> list[str]:
     if not AGENTS_DIR.exists():
         return []
     return sorted(p.stem for p in AGENTS_DIR.glob(f"*{AGENT_EXT}") if p.is_file())
+
+
+def _prompt_for_agent(label: str) -> str:
+    existing = _list_agent_names()
+    choices = existing + ["human"]
+    default_agent = existing[0] if existing else "human"
+    return click.prompt(
+        f"{label} name",
+        type=click.Choice(choices),
+        default=default_agent,
+        show_default=bool(default_agent),
+    )
+
+
+def _load_action_policy_from_file(agent_name: str):
+    if agent_name.lower() == "human":
+        return HumanPolicy()
+    agent_path = AGENTS_DIR / f"{agent_name}{AGENT_EXT}"
+    if not agent_path.exists():
+        raise click.ClickException(f"Agent '{agent_name}' not found at {agent_path}")
+    with agent_path.open(encoding="utf-8") as fp:
+        agent_cfg = yaml.safe_load(fp) or {}
+    return _load_action_policy(agent_cfg.get("action_policy", DEFAULT_ACTION_POLICY))

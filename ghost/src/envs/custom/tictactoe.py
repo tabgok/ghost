@@ -33,12 +33,11 @@ class _AvailableMovesSpace:
         self.env = env
 
     def sample(self) -> int:
-        empties = np.argwhere(self.env._board == 0)
-        if len(empties) == 0:
+        options = self.available_actions()
+        if not options:
             return 0
-        idx = self.env.np_random.integers(len(empties))
-        r, c = empties[idx]
-        return int(r * 3 + c)
+        idx = self.env.np_random.integers(len(options))
+        return options[idx]
 
     def contains(self, x: int) -> bool:
         r, c = divmod(int(x), 3)
@@ -47,6 +46,10 @@ class _AvailableMovesSpace:
             and 0 <= c < 3
             and self.env._board[r, c] == 0
         )
+
+    def available_actions(self) -> list[int]:
+        empties = np.argwhere(self.env._board == 0)
+        return [int(r * 3 + c) for r, c in empties]
 
 
 @dataclass
@@ -86,10 +89,12 @@ class TicTacToeEnv(gym.Env):
         self._win_line = None
         return self._board.copy(), {}
 
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, dict]:
+    def step(self, action: int, marker: int | None = None) -> Tuple[np.ndarray, float, bool, bool, dict]:
         if self._done:
             return self._board.copy(), 0.0, True, True, {}
 
+        marker = 1 if marker is None else int(marker)
+        opponent_marker = 2 if marker == 1 else 1
         row, col = divmod(int(action), 3)
         reward = 0.0
         terminated = False
@@ -103,11 +108,11 @@ class TicTacToeEnv(gym.Env):
             return self._board.copy(), reward, terminated, truncated, {}
 
         # Agent move
-        self._board[row, col] = 1
+        self._board[row, col] = marker
         if self.render_mode == "human":
             self._render_tk(self._render_frame(), delay=True)
 
-        has_win, win_cells = _check_winner(self._board, 1)
+        has_win, win_cells = _check_winner(self._board, marker)
         if has_win:
             reward = 1.0
             terminated = True
@@ -126,11 +131,11 @@ class TicTacToeEnv(gym.Env):
             if len(empties) > 0:
                 idx = self.np_random.integers(len(empties))
                 r, c = empties[idx]
-                self._board[r, c] = 2
+                self._board[r, c] = opponent_marker
                 if self.render_mode == "human":
                     self._render_tk(self._render_frame(), delay=True)
 
-        has_win, win_cells = _check_winner(self._board, 2)
+        has_win, win_cells = _check_winner(self._board, opponent_marker)
         if has_win:
             reward = -1.0
             terminated = True
