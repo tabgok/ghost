@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import yaml
 import click
+import time
 
 import gymnasium as gym
 
@@ -210,6 +211,8 @@ def run(agent_name: str | None, env_name: str | None, episodes: int, render_mode
         click.echo(
             f"Episode {ep}/{episodes}: steps={steps}, total_reward={total_reward:.3f}"
         )
+        if render_mode == "human":
+            time.sleep(2.0)
 
 
 def _make_env(env_name: str, render_mode: str):

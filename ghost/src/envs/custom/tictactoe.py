@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Tuple, List, Optional
 import tkinter as tk
 import time
 
@@ -10,10 +10,43 @@ import gymnasium as gym
 from gymnasium import spaces
 
 
-def _check_winner(board: np.ndarray, marker: int) -> bool:
-    diagonals = np.stack([np.diag(board), np.diag(np.fliplr(board))])
-    lines = np.concatenate([board, board.T, diagonals], axis=0)
-    return np.any(np.all(lines == marker, axis=1))
+def _check_winner(board: np.ndarray, marker: int) -> tuple[bool, Optional[List[tuple[int, int]]]]:
+    """Return (has_winner, winning_cells)."""
+    # Rows and columns
+    for i in range(3):
+        if np.all(board[i, :] == marker):
+            return True, [(i, c) for c in range(3)]
+        if np.all(board[:, i] == marker):
+            return True, [(r, i) for r in range(3)]
+    # Diagonals
+    if np.all(np.diag(board) == marker):
+        return True, [(i, i) for i in range(3)]
+    if np.all(np.diag(np.fliplr(board)) == marker):
+        return True, [(i, 2 - i) for i in range(3)]
+    return False, None
+
+
+class _AvailableMovesSpace:
+    """Action space that samples from currently available moves."""
+
+    def __init__(self, env: "TicTacToeEnv") -> None:
+        self.env = env
+
+    def sample(self) -> int:
+        empties = np.argwhere(self.env._board == 0)
+        if len(empties) == 0:
+            return 0
+        idx = self.env.np_random.integers(len(empties))
+        r, c = empties[idx]
+        return int(r * 3 + c)
+
+    def contains(self, x: int) -> bool:
+        r, c = divmod(int(x), 3)
+        return (
+            0 <= r < 3
+            and 0 <= c < 3
+            and self.env._board[r, c] == 0
+        )
 
 
 @dataclass
@@ -33,9 +66,10 @@ class TicTacToeEnv(gym.Env):
 
     def __post_init__(self) -> None:
         self.observation_space = spaces.Box(low=0, high=2, shape=(3, 3), dtype=np.int8)
-        self.action_space = spaces.Discrete(9)
+        self.action_space = _AvailableMovesSpace(self)
         self._board = np.zeros((3, 3), dtype=np.int8)
         self._done = False
+        self._win_line: Optional[List[tuple[int, int]]] = None
         if self.render_mode not in self.metadata["render_modes"]:
             self.render_mode = None
         self._window: tk.Tk | None = None
@@ -49,6 +83,7 @@ class TicTacToeEnv(gym.Env):
         super().reset(seed=seed)
         self._board.fill(0)
         self._done = False
+        self._win_line = None
         return self._board.copy(), {}
 
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, dict]:
@@ -72,10 +107,12 @@ class TicTacToeEnv(gym.Env):
         if self.render_mode == "human":
             self._render_tk(self._render_frame(), delay=True)
 
-        if _check_winner(self._board, 1):
+        has_win, win_cells = _check_winner(self._board, 1)
+        if has_win:
             reward = 1.0
             terminated = True
             self._done = True
+            self._win_line = win_cells
             return self._board.copy(), reward, terminated, truncated, {}
 
         if not (self._board == 0).any():
@@ -93,10 +130,12 @@ class TicTacToeEnv(gym.Env):
                 if self.render_mode == "human":
                     self._render_tk(self._render_frame(), delay=True)
 
-        if _check_winner(self._board, 2):
+        has_win, win_cells = _check_winner(self._board, 2)
+        if has_win:
             reward = -1.0
             terminated = True
             self._done = True
+            self._win_line = win_cells
             return self._board.copy(), reward, terminated, truncated, {}
 
         if not (self._board == 0).any():
@@ -106,15 +145,15 @@ class TicTacToeEnv(gym.Env):
         return self._board.copy(), reward, terminated, truncated, {}
 
     def render(self):
-        frame = self._render_frame()
+        frame = self._render_frame(self._win_line)
         if self.render_mode == "human":
-            self._render_tk(frame, delay=False)
+            self._render_tk(frame, delay=False, win_line=self._win_line)
             return None
         if self.render_mode == "rgb_array":
             return frame
         return None
 
-    def _render_frame(self):
+    def _render_frame(self, win_line: Optional[List[tuple[int, int]]] = None):
         size = 240
         cell = size // 3
         canvas = np.full((size, size, 3), 255, dtype=np.uint8)
@@ -146,9 +185,20 @@ class TicTacToeEnv(gym.Env):
                     ring = (dist <= radius) & (dist >= inner)
                     sub[ring] = np.array([65, 105, 225], dtype=np.uint8)
                 canvas[y0:y1, x0:x1] = sub
+
+        if win_line:
+            # Draw a line through the winning cells
+            r0, c0 = win_line[0]
+            r1, c1 = win_line[-1]
+            x0 = int((c0 + 0.5) * cell)
+            y0 = int((r0 + 0.5) * cell)
+            x1 = int((c1 + 0.5) * cell)
+            y1 = int((r1 + 0.5) * cell)
+            rr, cc = np.linspace(y0, y1, num=200, dtype=int), np.linspace(x0, x1, num=200, dtype=int)
+            canvas[rr, cc] = np.array([34, 139, 34], dtype=np.uint8)
         return canvas
 
-    def _render_tk(self, frame: np.ndarray, delay: bool) -> None:
+    def _render_tk(self, frame: np.ndarray, delay: bool, win_line: Optional[List[tuple[int, int]]] = None) -> None:
         try:
             if self._window is None:
                 self._window = tk.Tk()
@@ -189,6 +239,15 @@ class TicTacToeEnv(gym.Env):
                         canvas.create_line(x0 + 10, y1 - 10, x1 - 10, y0 + 10, width=3, fill="#DC143C")
                     elif marker == 2:  # O
                         canvas.create_oval(x0 + 10, y0 + 10, x1 - 10, y1 - 10, width=3, outline="#4169E1")
+
+            if win_line:
+                r0, c0 = win_line[0]
+                r1, c1 = win_line[-1]
+                x0 = offset + (c0 + 0.5) * cs
+                y0 = offset + (r0 + 0.5) * cs
+                x1 = offset + (c1 + 0.5) * cs
+                y1 = offset + (r1 + 0.5) * cs
+                canvas.create_line(x0, y0, x1, y1, width=5, fill="#228B22")
 
             self._window.update_idletasks()
             self._window.update()
