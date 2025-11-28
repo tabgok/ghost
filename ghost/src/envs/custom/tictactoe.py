@@ -9,14 +9,8 @@ from gymnasium import spaces
 
 
 def _check_winner(board: np.ndarray, marker: int) -> bool:
-    lines = np.concatenate(
-        [
-            board,  # rows
-            board.T,  # columns
-            np.array([[board.trace(), np.fliplr(board).trace()]]),  # diagonals
-        ],
-        axis=0,
-    )
+    diagonals = np.stack([np.diag(board), np.diag(np.fliplr(board))])
+    lines = np.concatenate([board, board.T, diagonals], axis=0)
     return np.any(np.all(lines == marker, axis=1))
 
 
