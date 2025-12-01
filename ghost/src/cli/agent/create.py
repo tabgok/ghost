@@ -6,10 +6,9 @@ import yaml
 from cli.agent import agent
 from cli.utils import (
     ACTIONS,
-    AGENTS_DIR,
-    AGENT_EXT,
     LEARNING_POLICIES,
 )
+import engine
 
 DEFAULT_ACTION_POLICY = "random"
 DEFAULT_EXPLORATION_POLICY = "epsilon_greedy"
@@ -84,13 +83,6 @@ def create_agent(
     if action_policy == "q_value" and learning_policy != "tabular_q":
         raise click.ClickException("Action policy 'q_value' requires learning policy 'tabular_q'.")
 
-    AGENTS_DIR.mkdir(parents=True, exist_ok=True)
-    path = AGENTS_DIR / f"{name}{AGENT_EXT}"
-    while path.exists():
-        click.echo(f"Agent '{name}' already exists at {path}")
-        name = click.prompt("Enter a new agent name")
-        path = AGENTS_DIR / f"{name}{AGENT_EXT}"
-
     payload = {
         "name": name,
         "action_policy": action_policy,
@@ -102,9 +94,8 @@ def create_agent(
         },
         "learning_policy": {"type": learning_policy},
     }
-    with path.open("w", encoding="utf-8") as fp:
-        yaml.safe_dump(payload, fp, sort_keys=False)
+    result = engine.create_agent(**payload)
 
     click.echo(
-        f"Created agent '{name}' with action policy '{action_policy}' at {path}"
+        f"Created agent '{name}' with action policy '{action_policy}'"
     )

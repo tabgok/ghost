@@ -24,4 +24,5 @@ packages = [
     "src/cli",
     "src/agent",
     "src/envs",
+    "src/engine",
 ]

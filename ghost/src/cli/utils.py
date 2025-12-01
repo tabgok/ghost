@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 import click
 import yaml
 import gymnasium as gym
@@ -10,34 +9,19 @@ from agent.policies.action.human import HumanPolicy
 from agent.policies.action.qvalue import QValuePolicy
 from agent.policies.learning.qlearning import TabularQLearningPolicy
 from envs.custom.tictactoe import TicTacToeEnv
+import engine
 
-BASE_DIR = Path.home() / ".ghost"
-AGENTS_DIR = BASE_DIR / "agents"
-AGENT_EXT = ".yaml"
 DEFAULT_ACTION_POLICY = "random"
 DEFAULT_EXPLORATION_POLICY = "epsilon_greedy"
 DEFAULT_LEARNING_POLICY = "noop"
-AVAILABLE_ENVS = ["tictactoe", "cartpole", "lunar_lander"]
+AVAILABLE_ENVS = ["tictactoe", "cartpole", "lunar_lander"]  # TODO: Refactor this, and the below, so there is a registry
 ACTIONS = [DEFAULT_ACTION_POLICY, "human", "q_value"]
 LEARNING_POLICIES = [DEFAULT_LEARNING_POLICY, "tabular_q"]
 
 
-def read_agent_config(agent_name: str) -> dict:
-    agent_path = AGENTS_DIR / f"{agent_name}{AGENT_EXT}"
-    if not agent_path.exists():
-        raise click.ClickException(f"Agent '{agent_name}' not found at {agent_path}")
-    with agent_path.open(encoding="utf-8") as fp:
-        return yaml.safe_load(fp) or {}
-
-
-def list_agent_names() -> list[str]:
-    if not AGENTS_DIR.exists():
-        return []
-    return sorted(p.stem for p in AGENTS_DIR.glob(f"*{AGENT_EXT}") if p.is_file())
-
 
 def prompt_for_agent(label: str) -> str:
-    existing = list_agent_names()
+    existing = engine.list_agents()
     choices = existing + ["human"]
     default_agent = existing[0] if existing else "human"
     return click.prompt(
@@ -63,11 +47,6 @@ def load_action_policy(agent_cfg: dict):
     raise click.ClickException(f"Unsupported action policy '{action_type}'")
 
 
-def load_action_policy_from_file(agent_name: str):
-    if agent_name.lower() == "human":
-        return HumanPolicy()
-    agent_cfg = read_agent_config(agent_name)
-    return load_action_policy(agent_cfg)
 
 
 def make_env(env_name: str, render_mode: str, two_players: bool = False):

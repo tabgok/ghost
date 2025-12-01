@@ -4,6 +4,7 @@ import click
 
 from cli.agent import agent as agent_group
 from cli.run import run
+from cli.train import train
 
 
 @click.group(
@@ -16,6 +17,7 @@ def ghost() -> None:
 
 ghost.add_command(agent_group)
 ghost.add_command(run)
+ghost.add_command(train)
 
 
 def main() -> None:

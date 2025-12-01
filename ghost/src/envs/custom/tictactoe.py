@@ -9,6 +9,8 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 
+from engine import register_environment
+
 
 def _check_winner(board: np.ndarray, marker: int) -> tuple[bool, Optional[List[tuple[int, int]]]]:
     """Return (has_winner, winning_cells)."""
@@ -66,6 +68,8 @@ class _AvailableMovesSpace:
         return {"board": rows, "options": self.available_actions()}
 
 
+
+@register_environment(name="TicTacToe")
 @dataclass
 class TicTacToeEnv(gym.Env):
     """Minimal Gymnasium Tic-Tac-Toe environment with a random opponent.
