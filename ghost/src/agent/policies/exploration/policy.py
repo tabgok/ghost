@@ -12,9 +12,9 @@ def _register_exploration_policy(cls: type):
 class ExplorationPolicy(ABC):
     """Determines whether to explore based on step counts or other signals."""
 
-    @abstractmethod
     def snapshot(self) -> dict[str, Any]:
         """Return a serializable representation of this policy."""
+        return {"type": self.__class__.__name__}
 
 
 @_register_exploration_policy
@@ -23,6 +23,3 @@ class NoOpExplorationPolicy(ExplorationPolicy):
 
     def explore(self, action: Any, action_space: Any) -> Any:
         return action
-
-    def snapshot(self) -> dict[str, Any]:
-        return {"type": "NoExplorationPolicy"}

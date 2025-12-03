@@ -13,14 +13,13 @@ from engine import agent_manager
 logger = getLogger(__name__)
 
 
-
 ### --- TRAINING --- ###
 def train(agents: tuple[str], environment: str, episodes: int) -> None:
     logger.info(f"Training agents {agents} in environment {environment} for {episodes} episodes.")
 
     for agent in agents:
         logger.debug(f"Loading agent: {agent}")
-        action_policy = agent_manager.load_agent(agent)
+        action_policy = agent_manager._load_agent(agent)
         if action_policy is None:
             logger.warning(f"Agent '{agent}' has no action policy loaded.")
     # Load the environment
@@ -35,7 +34,7 @@ def evaluate(agent_names: tuple[str], environment: str) -> None:
     agents = []
     for agent in agent_names:
         logger.debug(f"Loading agent: {agent}")
-        agent = agent_manager.load_agent(agent)
+        agent = agent_manager._load_agent(agent)
         agents.append(agent)
 
     # Load the environment

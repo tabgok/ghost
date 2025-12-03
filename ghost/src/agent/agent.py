@@ -1,16 +1,19 @@
 from abc import abstractmethod
 from agent.policies.action.policy import ActionPolicy
-from agent.policies.action.policy import HumanActionPolicy
+from agent.policies.action.policy import ACTION_POLICY_REGISTRY
 from agent.policies.learning.policy import LearningPolicy
-from agent.policies.learning.policy import NoOpLearningPolicy
+from agent.policies.learning.policy import LEARNING_POLICY_REGISTRY
 from agent.policies.exploration.policy import ExplorationPolicy
-from agent.policies.exploration.policy import NoOpExplorationPolicy
+from agent.policies.exploration.policy import EXPLORATION_POLICY_REGISTRY
+
 
 class Agent:
     def __init__(self,
-                 learning_policy: LearningPolicy,
-                 action_policy: ActionPolicy,
-                 exploration_policy: ExplorationPolicy) -> None:
+                name: str,
+                learning_policy: LearningPolicy,
+                action_policy: ActionPolicy,
+                exploration_policy: ExplorationPolicy) -> None:
+        self.name = name
         self.learning_policy = learning_policy()
         self.action_policy = action_policy()
         self.exploration_policy = exploration_policy()
@@ -26,12 +29,30 @@ class Agent:
     def end_episode(self) -> None:
         pass
 
-        
+    def snapshot(self) -> dict:
+        return {
+            "name": self.name,
+            "learning_policy": self.learning_policy.snapshot(),
+            "action_policy": self.action_policy.snapshot(),
+            "exploration_policy": self.exploration_policy.snapshot(),
+        }
 
+    @classmethod
+    def from_snapshot(cls, snapshot: dict):
+        name = snapshot["name"]
 
-class _HumanAgent(Agent):
-    def __init__(self):
-        return super().__init__(
-            learning_policy=NoOpLearningPolicy,
-            action_policy=HumanActionPolicy,
-            exploration_policy=NoOpExplorationPolicy)
+        learning_policy_type = snapshot["learning_policy"]["type"]
+        learning_policy_cls = LEARNING_POLICY_REGISTRY[learning_policy_type]
+
+        action_policy_type = snapshot["action_policy"]["type"]
+        action_policy_cls = ACTION_POLICY_REGISTRY[action_policy_type]
+
+        exploration_policy_type = snapshot["exploration_policy"]["type"]
+        exploration_policy_cls = EXPLORATION_POLICY_REGISTRY[exploration_policy_type]
+
+        return cls(
+            name=name,
+            learning_policy=learning_policy_cls,
+            action_policy=action_policy_cls,
+            exploration_policy=exploration_policy_cls,
+        )

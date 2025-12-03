@@ -12,6 +12,10 @@ class ActionPolicy(ABC):
     @abstractmethod
     def act(self, action_space: Any, observation: Any) -> Any:
         """Select an action given the available action space and current observation."""
+    
+    def snapshot(self) -> dict[str, Any]:
+        """Return a serializable representation of this policy."""
+        return {"type": self.__class__.__name__}
 
 
 @_register_action_policy

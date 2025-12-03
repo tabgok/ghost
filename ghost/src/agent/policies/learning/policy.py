@@ -16,9 +16,9 @@ class LearningPolicy(ABC):
     def learn(self, transition: Any) -> None:
         """Update internal state given a transition."""
 
-    @abstractmethod
     def snapshot(self) -> dict[str, Any]:
         """Return a serializable representation of this policy."""
+        return {"type": self.__class__.__name__}
 
 
 @_register_learning_policy
@@ -27,6 +27,3 @@ class NoOpLearningPolicy(LearningPolicy):
 
     def learn(self, *args, **kwargs) -> None:
         pass
-
-    def snapshot(self) -> dict[str, Any]:
-        return {"type": "NoLearningPolicy"}
