@@ -15,7 +15,6 @@ DEFAULT_ACTION_POLICY = "random"
 DEFAULT_EXPLORATION_POLICY = "epsilon_greedy"
 DEFAULT_LEARNING_POLICY = "noop"
 AVAILABLE_ENVS = ["tictactoe", "cartpole", "lunar_lander"]  # TODO: Refactor this, and the below, so there is a registry
-ACTIONS = [DEFAULT_ACTION_POLICY, "human", "q_value"]
 LEARNING_POLICIES = [DEFAULT_LEARNING_POLICY, "tabular_q"]
 
 

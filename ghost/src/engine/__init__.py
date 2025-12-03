@@ -4,11 +4,12 @@ from .engine import (
 )
 
 from .agent_manager import (
-    create_agent,
+    _load_agent,
     describe_agent,
     rm_agent as delete_agent,
     register_agent,
     list_agents,
+    create_agent,
 )
 
 

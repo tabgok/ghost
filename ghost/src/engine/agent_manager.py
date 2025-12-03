@@ -1,22 +1,20 @@
 import yaml
 from pathlib import Path
 
+from agent.policies.action.policy import ACTION_POLICY_REGISTRY 
+from agent.policies.exploration.policy import EXPLORATION_POLICY_REGISTRY
+from agent.policies.learning.policy import LEARNING_POLICY_REGISTRY
 from agent.agent import Agent
 from agent.agent import _HumanAgent
 
 
 BASE_DIR = Path.home() / ".ghost"
+POLICY_REGISTRY: dict[str, Agent] = {}
 AGENT_REGISTRY: dict[str, Agent] = {"HumanAgent": _HumanAgent}
 AGENTS_DIR = BASE_DIR / "agents"
 AGENT_EXT = ".yaml"
 
 ### --- AGENTS --- ###
-def load_agent(agent_name: str):
-    if agent_name not in AGENT_REGISTRY:
-        raise NameError(f"Agent '{agent_name}' is not registered.")
-    agent_cls = AGENT_REGISTRY[agent_name]
-    return agent_cls()
-
 def register_agent(cls: type):
     AGENT_REGISTRY[cls.__name__] = cls
     return cls
@@ -35,17 +33,25 @@ def describe_agent(agent: str) -> dict[str, dict]:
     return details
 
 
-def create_agent(agent_name: str, **kwargs):
-    if agent_name not in AGENT_REGISTRY:
-        raise NameError(f"Agent '{agent_name}' is not registered.")
-    agent_cls = AGENT_REGISTRY[agent_name]
-    return agent_cls(**kwargs)
-
-
 def rm_agent(agent_name: str) -> None:
     if agent_name not in AGENT_REGISTRY:
         raise NameError(f"Agent '{agent_name}' is not registered.")
     del AGENT_REGISTRY[agent_name]
+
+def create_agent(**kwargs) -> str:
+    agent_name = kwargs.get("name")
+
+### --- POLICIES --- ###
+def list_action_policies() -> list[str]:
+    return list(ACTION_POLICY_REGISTRY.keys())
+
+def list_exploration_policies() -> list[str]:
+    return list(EXPLORATION_POLICY_REGISTRY.keys())
+
+def list_learning_policies() -> list[str]:
+    return list(LEARNING_POLICY_REGISTRY.keys())
+
+
 
 
 ### UTILITY FUNCTIONS ###
@@ -68,3 +74,9 @@ def load_action_policy_from_file(agent_name: str):
     agent_cfg = read_agent_config(agent_name)
     # TODO: Return policiesreturn load_action_policy(agent_cfg)
     return None
+
+def _load_agent(agent_name: str, **kwargs) -> Agent:
+    if agent_name not in AGENT_REGISTRY:
+        raise NameError(f"Agent '{agent_name}' is not registered.")
+    agent_cls = AGENT_REGISTRY[agent_name]
+    return agent_cls(**kwargs)

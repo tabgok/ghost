@@ -2,9 +2,9 @@ from abc import abstractmethod
 from agent.policies.action.policy import ActionPolicy
 from agent.policies.action.policy import HumanActionPolicy
 from agent.policies.learning.policy import LearningPolicy
-from agent.policies.learning.policy import NoLearningPolicy
+from agent.policies.learning.policy import NoOpLearningPolicy
 from agent.policies.exploration.policy import ExplorationPolicy
-from agent.policies.exploration.policy import NoExplorationPolicy
+from agent.policies.exploration.policy import NoOpExplorationPolicy
 
 class Agent:
     def __init__(self,
@@ -32,6 +32,6 @@ class Agent:
 class _HumanAgent(Agent):
     def __init__(self):
         return super().__init__(
-            learning_policy=NoLearningPolicy,
+            learning_policy=NoOpLearningPolicy,
             action_policy=HumanActionPolicy,
-            exploration_policy=NoExplorationPolicy)
+            exploration_policy=NoOpExplorationPolicy)
