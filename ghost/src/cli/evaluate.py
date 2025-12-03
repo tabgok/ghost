@@ -6,7 +6,7 @@ import click
 import engine
 from engine import environment_manager
 
-@click.command("train", help="Train an agent in a specified environment.")
+@click.command("evaluate", help="Evaluate an agent in a specified environment.")
 @click.option(
     "--environment",
     "env_name",
@@ -14,15 +14,7 @@ from engine import environment_manager
     prompt=True,
     type=click.Choice(engine.environment_manager.list_environments()),
     default=engine.environment_manager.list_environments()[0],
-    help="Name of the environment to be trained in.",
-)
-@click.option(
-    "--episodes",
-    type=click.IntRange(min=1),
-    default=1000,
-    show_default=True,
-    prompt=True,
-    help="Number of training episodes.",
+    help="Name of the environment to be evaluated in.",
 )
 @click.option(
     "--agent",
@@ -34,7 +26,7 @@ from engine import environment_manager
     default=(engine.list_agents()[0],),
     help="Agents for the environment, can be repeated for multiple agents.",
 )
-def train(env_name: str, agents: tuple[str], episodes: int) -> None:
+def evaluate(env_name: str, agents: tuple[str]) -> None:
     if len(agents) != environment_manager.describe_environment(env_name).get("num_agents", 1):
         agents = ()
 
@@ -46,4 +38,4 @@ def train(env_name: str, agents: tuple[str], episodes: int) -> None:
         )
         agents += (promt_for_agent,)
 
-    engine.train(agents, env_name, episodes)
+    engine.evaluate(agents, env_name)

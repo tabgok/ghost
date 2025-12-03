@@ -5,6 +5,11 @@ import click
 from cli.agent import agent as agent_group
 from cli.run import run
 from cli.train import train
+from cli.evaluate import evaluate
+
+from logging import basicConfig, DEBUG
+FORMATTER = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+basicConfig(level=DEBUG, format=FORMATTER)
 
 
 @click.group(
@@ -18,6 +23,7 @@ def ghost() -> None:
 ghost.add_command(agent_group)
 ghost.add_command(run)
 ghost.add_command(train)
+ghost.add_command(evaluate)
 
 
 def main() -> None:

@@ -1,7 +1,6 @@
 from .engine import (
-    register_environment,
-    list_environments,
     train,
+    evaluate
 )
 
 from .agent_manager import (
@@ -10,4 +9,11 @@ from .agent_manager import (
     rm_agent as delete_agent,
     register_agent,
     list_agents,
+)
+
+
+from .environment_manager import (
+    describe_environment,
+    list_environments,
+    register_environment
 )

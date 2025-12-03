@@ -28,7 +28,7 @@ def _check_winner(board: np.ndarray, marker: int) -> tuple[bool, Optional[List[t
     return False, None
 
 
-class _AvailableMovesSpace:
+class _AvailableMovesSpace(gym.spaces.Space):
     """Action space that samples from currently available moves."""
 
     def __init__(self, env: "TicTacToeEnv") -> None:
@@ -74,20 +74,22 @@ class _AvailableMovesSpace:
 class TicTacToeEnv(gym.Env):
     """Minimal Gymnasium Tic-Tac-Toe environment with a random opponent.
 
-    - Agent is marker 1, opponent is marker 2, empty is 0.
+    - Player1 is marker 1, Player2 is marker 2, empty is 0.
     - Observations: 3x3 int grid.
     - Actions: Discrete(9) representing cell index (row-major).
     - Rewards: +1 win, -1 loss, 0 draw/ongoing, -0.5 invalid move (episode ends).
     """
 
-    opponent_random: bool = True
-    render_mode: str | None = "human"
+    metadata = {
+            "render_modes": ["human", "rgb_array"],
+            "agent_count": 2,
+        }
 
-    metadata = {"render_modes": ["human", "rgb_array"]}
-
-    def __post_init__(self) -> None:
+    def __init__(self, render_mode: Optional[str] = None) -> None:
+        self.render_mode = render_mode
+        self.observation_space =  spaces.Box
+        self.action_space =  _AvailableMovesSpace(self)
         self.observation_space = spaces.Box(low=0, high=2, shape=(3, 3), dtype=np.int8)
-        self.action_space = _AvailableMovesSpace(self)
         self._board = np.zeros((3, 3), dtype=np.int8)
         self._done = False
         self._win_line: Optional[List[tuple[int, int]]] = None
@@ -98,6 +100,7 @@ class TicTacToeEnv(gym.Env):
         self._canvas: tk.Canvas | None = None
         self._cell_size = 120
         self._margin = 10
+        self.marker = 1 
 
     def reset(
         self, *, seed: int | None = None, options: dict | None = None
@@ -107,14 +110,16 @@ class TicTacToeEnv(gym.Env):
         self._done = False
         self._win_line = None
         self._winner = None
+        self.marker = 1
         return self._board.copy(), {}
 
-    def step(self, action: int, marker: int | None = None) -> Tuple[np.ndarray, float, bool, bool, dict]:
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, dict]:
         if self._done:
             return self._board.copy(), 0.0, True, True, {}
 
-        marker = 1 if marker is None else int(marker)
+        marker = self.marker
         opponent_marker = 2 if marker == 1 else 1
+        self.marker = (self.marker) % 2 + 1
         row, col = divmod(int(action), 3)
         reward = 0.0
         terminated = False
@@ -146,16 +151,6 @@ class TicTacToeEnv(gym.Env):
             terminated = True
             self._done = True
             return self._board.copy(), reward, terminated, truncated, {}
-
-        # Opponent move: pick random available cell
-        if self.opponent_random:
-            empties = np.argwhere(self._board == 0)
-            if len(empties) > 0:
-                idx = self.np_random.integers(len(empties))
-                r, c = empties[idx]
-                self._board[r, c] = opponent_marker
-                if self.render_mode == "human":
-                    self._render_tk(self._render_frame(), delay=True)
 
         has_win, win_cells = _check_winner(self._board, opponent_marker)
         if has_win:
@@ -290,3 +285,9 @@ class TicTacToeEnv(gym.Env):
             symbols = {0: ".", 1: "X", 2: "O"}
             lines = [" ".join(symbols[cell] for cell in row) for row in self._board]
             print("\n".join(lines))
+
+
+gym.register(
+    id="TicTacToe",
+    entry_point="envs.custom.tictactoe:TicTacToeEnv",
+)
