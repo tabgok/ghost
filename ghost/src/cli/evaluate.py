@@ -21,16 +21,17 @@ from engine import environment_manager
     "agents",
     multiple=True,
     required=False,
-    prompt=True,
+    prompt=False,
     type=click.Choice(engine.list_agents()),
-    default=(engine.list_agents()[0],),
     help="Agents for the environment, can be repeated for multiple agents.",
 )
 def evaluate(env_name: str, agents: tuple[str]) -> None:
-    if len(agents) != environment_manager.describe_environment(env_name).get("num_agents", 1):
+    if not agents:
         agents = ()
+    env_cfg = engine.environment_manager.describe_environment(env_name)
+    num_agents = env_cfg.get("metadata", {}).get("agent_count", 1)
 
-    for _ in range(environment_manager.describe_environment(env_name).get("num_agents", 1)):
+    for _ in range(num_agents - len(agents)):
         promt_for_agent = click.prompt(
             f"Select agent for environment '{env_name}'",
             type=click.Choice(engine.list_agents()),

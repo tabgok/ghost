@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 from logging import getLogger
 
@@ -92,4 +93,4 @@ def _loop(agents: list[Agent], env: gym.Env, episodes: int=1000, progress_bar=Tr
 
         agent.end_episode()
     env.close()
-    input()
+    time.sleep(1)
