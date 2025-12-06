@@ -5,7 +5,7 @@ import yaml
 import gymnasium as gym
 
 from agent.policies.action.random import RandomPolicy
-from agent.policies.action.human import HumanPolicy
+from agent.policies.action.policy import HumanActionPolicy
 from agent.policies.action.qvalue import QValuePolicy
 from agent.policies.learning.qlearning import TabularQLearningPolicy
 from envs.custom.tictactoe import TicTacToeEnv
@@ -36,7 +36,7 @@ def load_action_policy(agent_cfg: dict):
     if action_type == "random":
         return RandomPolicy()
     if action_type == "human":
-        return HumanPolicy()
+        return HumanActionPolicy()
     if action_type == "q_value":
         learning_cfg = agent_cfg.get("learning_policy", {})
         if learning_cfg.get("type") != "tabular_q":

@@ -4,7 +4,6 @@ import time
 import click
 
 import engine
-from engine import environment_manager
 
 @click.command("evaluate", help="Evaluate an agent in a specified environment.")
 @click.option(

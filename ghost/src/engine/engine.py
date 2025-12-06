@@ -52,15 +52,12 @@ def _discretize(obs):
         obs (array-like): [cart position, cart velocity, pole angle, pole angular velocity]
     
     Returns:
-        tuple of 4 integers, each in [0, NUM_BINS]
     """
     return obs
 
 
 def _loop(agents: list[Agent], env: gym.Env, episodes: int=1000, progress_bar=True) -> None:
-    cur_eps = 1
-
-    for episode_count in range(1,episodes+1):
+    for _ in range(1, episodes+1):
         # Reset environment to start a new episode
         observation, info = env.reset()
         observation = _discretize(observation)
