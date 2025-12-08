@@ -24,16 +24,6 @@ from engine import environment_manager
     prompt=True,
     help="Number of training episodes.",
 )
-@click.option(
-    "--agent",
-    "agents",
-    multiple=True,
-    required=False,
-    prompt=True,
-    type=click.Choice(engine.list_agents()),
-    default=(engine.list_agents()[0],),
-    help="Agents for the environment, can be repeated for multiple agents.",
-)
 def train(env_name: str, agents: tuple[str], episodes: int) -> None:
     if len(agents) != environment_manager.describe_environment(env_name).get("num_agents", 1):
         agents = ()

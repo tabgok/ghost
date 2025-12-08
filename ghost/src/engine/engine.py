@@ -1,11 +1,6 @@
 import time
-from pathlib import Path
 from logging import getLogger
 
-
-import gymnasium as gym
-import numpy as np
-import yaml
 
 from agent.agent import Agent
 from engine import environment_manager
@@ -35,7 +30,7 @@ def evaluate(agent_names: tuple[str], environment: str) -> None:
     agents = []
     for agent in agent_names:
         logger.debug(f"Loading agent: {agent}")
-        agent = agent_manager._load_agent(agent)
+        agent = agent_manager.AGENT_REGISTRY[agent]()
         agents.append(agent)
 
     # Load the environment
@@ -56,7 +51,7 @@ def _discretize(obs):
     return obs
 
 
-def _loop(agents: list[Agent], env: gym.Env, episodes: int=1000, progress_bar=True) -> None:
+def _loop(agents: list[Agent], env, episodes: int=1000, progress_bar=True) -> None:
     for _ in range(1, episodes+1):
         # Reset environment to start a new episode
         observation, info = env.reset()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
+import numpy as np
 
 ACTION_POLICY_REGISTRY: dict[str, ActionPolicy] = {}
 
@@ -29,4 +30,11 @@ class HumanActionPolicy(ActionPolicy):
 class RandomActionPolicy(ActionPolicy):
     def act(self, action_space: Any, observation: Any) -> Any:
         action = action_space.sample()
+        return action
+
+
+@_register_action_policy
+class GreedyPolicy(ActionPolicy):
+    def act(self, action_space: Any, observation: Any) -> Any:
+        action = np.argmax(observation)
         return action

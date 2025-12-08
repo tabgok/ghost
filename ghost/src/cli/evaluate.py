@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 import click
 
 import engine
@@ -30,9 +29,10 @@ def evaluate(env_name: str, agents: tuple[str]) -> None:
     env_cfg = engine.environment_manager.describe_environment(env_name)
     num_agents = env_cfg.get("metadata", {}).get("agent_count", 1)
 
-    for _ in range(num_agents - len(agents)):
+    undefined_agents = num_agents - len(agents)
+    for i in range(undefined_agents):
         promt_for_agent = click.prompt(
-            f"Select agent for environment '{env_name}'",
+            f"Select agent {i+1} of {undefined_agents} for environment '{env_name}'",
             type=click.Choice(engine.list_agents()),
             default=engine.list_agents()[0],
         )
