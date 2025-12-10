@@ -14,7 +14,7 @@ class LearningPolicy(ABC):
     """Defines how an agent updates its internal state from experience."""
 
     @abstractmethod
-    def learn(self, transition: Any) -> None:
+    def learn(self, prior_observation, observation, action, reward, done) -> None:
         """Update internal state given a transition."""
 
     @abstractmethod
@@ -22,7 +22,7 @@ class LearningPolicy(ABC):
         """Reset any episode-specific state."""
 
     @abstractmethod
-    def episode_end(self, reward: Any) -> None:
+    def end_episode(self) -> None:
         """Handle end of episode updates."""
 
     def snapshot(self) -> dict[str, Any]:
@@ -34,29 +34,56 @@ class LearningPolicy(ABC):
 class NoOpLearningPolicy(LearningPolicy):
     """A policy that does not learn."""
 
+    def values(self, observation) -> dict[int, float]:
+        """Return empty values for all actions."""
+        return {}
+    
     def learn(self, *args, **kwargs) -> None:
         pass
 
     def reset(self) -> None:
         pass
 
-    def episode_end(self, reward: Any) -> None:
+    def end_episode(self) -> None:
         pass
+
+
+
+
 
 @_register_learning_policy
 class MonteCarloLearningPolicy(LearningPolicy):
     """A simple Monte Carlo learning policy."""
     def __init__(self):
-        self.q_table = defaultdict(lambda: 0.8)  # Set high initial Q-values
+        self.q_table = defaultdict(float)
         self.states = []
+        self.alpha = 0.1 # Learning rate, which is a proxy for "average" so we don't have to keep track of N
+        self.gamma = 0.8 # Discount factor, which is a weight on future rewards
 
     def reset(self):
         self.states = []
 
-    def learn(self, transition: Any) -> None:
+    def learn(self, prior_observation, observation, action, reward, done) -> None:
         # Store the transitions and rewards
-        self.states.append(transition)
+        obs_hash = hash(observation.tobytes())
+        prior_obs_hash = hash(prior_observation.tobytes())
+        self.states.append((prior_obs_hash, obs_hash, action, reward))
+    
+    def values(self, observation) -> dict[int, float]:
+        """Return the learned values for each action in the given observation."""
+        obs_hash = hash(observation.tobytes())
+        action_values = {}
+        for action in range(0,  observation.shape[0]):  # Assuming discrete actions from 0 to n-1
+            entry = (obs_hash, action)
+            action_values[action] = self.q_table[entry]
+        return action_values
 
-    def episode_end(self, reward) -> None:
+    def end_episode(self) -> None:
         """Handle end of episode updates."""
-        pass
+        G = 0
+        for prior_observation, _, last_action, reward in reversed(self.states):
+            G = reward + self.gamma * G
+            entry = (prior_observation, last_action)
+            cur_value = self.q_table[entry]
+            self.q_table[entry] = cur_value + self.alpha * (G - cur_value)
+        self.reset()

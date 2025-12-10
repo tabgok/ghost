@@ -18,8 +18,9 @@ class Agent:
         self.action_policy = action_policy()
         self.exploration_policy = exploration_policy()
 
-    def select_action(self, action_space, observation_space, observation):
-        action = self.action_policy.act(action_space, observation)
+    def select_action(self, action_space, observation):
+        learned_values = self.learning_policy.values(observation)
+        action = self.action_policy.act(action_space, observation, learned_values)
         action = self.exploration_policy.explore(action, action_space)
         return action
 
@@ -27,7 +28,11 @@ class Agent:
         self.learning_policy.learn(prior_observation, observation, action, reward, done)
     
     def end_episode(self) -> None:
-        pass
+        self.learning_policy.end_episode()
+
+    def reset(self) -> None:
+        self.learning_policy.reset()
+
 
     def snapshot(self) -> dict:
         return {

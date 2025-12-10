@@ -36,6 +36,7 @@ class HumanAgent(Agent):
             exploration_policy=EXPLORATION_POLICY_REGISTRY["NoOpExplorationPolicy"],
         )
 
+
 @register_agent
 class RandomAgent(Agent):
     def __init__(self) -> None:
@@ -46,6 +47,7 @@ class RandomAgent(Agent):
             exploration_policy=EXPLORATION_POLICY_REGISTRY["NoOpExplorationPolicy"],
         )
 
+
 @register_agent
 class GreedyAgent(Agent):
     def __init__(self) -> None:
@@ -54,4 +56,15 @@ class GreedyAgent(Agent):
             learning_policy=LEARNING_POLICY_REGISTRY["NoOpLearningPolicy"],
             action_policy=ACTION_POLICY_REGISTRY["GreedyPolicy"],
             exploration_policy=EXPLORATION_POLICY_REGISTRY["NoOpExplorationPolicy"],
+        )
+
+
+@register_agent
+class MonteCarloAgent(Agent):
+    def __init__(self) -> None:
+        super().__init__(
+            name="MonteCarloAgent",
+            learning_policy=LEARNING_POLICY_REGISTRY["MonteCarloLearningPolicy"],
+            action_policy=ACTION_POLICY_REGISTRY["GreedyPolicy"],
+            exploration_policy=EXPLORATION_POLICY_REGISTRY["EpsilonDecayExplorationPolicy"],
         )

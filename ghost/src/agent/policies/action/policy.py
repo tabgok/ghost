@@ -11,7 +11,7 @@ def _register_action_policy(cls: type):
 
 class ActionPolicy(ABC):
     @abstractmethod
-    def act(self, action_space: Any, observation: Any) -> Any:
+    def act(self, action_space: Any, observation: Any, learned_values: Any) -> Any:
         """Select an action given the available action space and current observation."""
     
     def snapshot(self) -> dict[str, Any]:
@@ -28,13 +28,13 @@ class HumanActionPolicy(ActionPolicy):
     
 @_register_action_policy
 class RandomActionPolicy(ActionPolicy):
-    def act(self, action_space: Any, observation: Any) -> Any:
+    def act(self, action_space: Any, observation: Any, learned_values: Any) -> Any:
         action = action_space.sample()
         return action
 
 
 @_register_action_policy
 class GreedyPolicy(ActionPolicy):
-    def act(self, action_space: Any, observation: Any) -> Any:
-        action = np.argmax(observation)
+    def act(self, action_space: Any, observation: Any, action_space_values: Any) -> Any:
+        action = np.argmax(action_space_values)
         return action

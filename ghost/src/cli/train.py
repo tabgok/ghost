@@ -24,13 +24,16 @@ from engine import environment_manager
     prompt=True,
     help="Number of training episodes.",
 )
-def train(env_name: str, agents: tuple[str], episodes: int) -> None:
-    if len(agents) != environment_manager.describe_environment(env_name).get("num_agents", 1):
-        agents = ()
+def train(env_name: str, episodes: int) -> None:
+    agents = ()
 
-    for _ in range(environment_manager.describe_environment(env_name).get("num_agents", 1)):
+    env_cfg = engine.environment_manager.describe_environment(env_name)
+    num_agents = env_cfg.get("metadata", {}).get("agent_count", 1)
+
+    undefined_agents = num_agents - len(agents)
+    for i in range(undefined_agents):
         promt_for_agent = click.prompt(
-            f"Select agent for environment '{env_name}'",
+            f"Select agent {i+1} of {undefined_agents} for environment '{env_name}'",
             type=click.Choice(engine.list_agents()),
             default=engine.list_agents()[0],
         )

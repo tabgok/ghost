@@ -1,5 +1,6 @@
 import time
 from logging import getLogger
+import tqdm
 
 
 from agent.agent import Agent
@@ -10,17 +11,20 @@ logger = getLogger(__name__)
 
 
 ### --- TRAINING --- ###
-def train(agents: tuple[str], environment: str, episodes: int) -> None:
-    logger.info(f"Training agents {agents} in environment {environment} for {episodes} episodes.")
+def train(agent_names: tuple[str], environment: str, episodes: int) -> None:
+    logger.info(f"Training agents {agent_names} in environment {environment} for {episodes} episodes.")
 
-    for agent in agents:
+    agents = []
+    for agent in agent_names:
         logger.debug(f"Loading agent: {agent}")
-        action_policy = agent_manager._load_agent(agent)
-        if action_policy is None:
-            logger.warning(f"Agent '{agent}' has no action policy loaded.")
+        agent = agent_manager.AGENT_REGISTRY[agent]()
+        agents.append(agent)
     # Load the environment
     logger.debug(f"Loading environment: {environment}")
     env = environment_manager.instantiate_environment(environment)
+    _loop(agents, env, episodes=episodes, progress_bar=True)
+    env = environment_manager.instantiate_environment(environment, render_mode="human")
+    _loop(agents, env, episodes=1, progress_bar=False)
 
 
 def evaluate(agent_names: tuple[str], environment: str) -> None:
@@ -52,7 +56,12 @@ def _discretize(obs):
 
 
 def _loop(agents: list[Agent], env, episodes: int=1000, progress_bar=True) -> None:
-    for _ in range(1, episodes+1):
+    if progress_bar:
+        from tqdm import trange
+        episode_iterator = trange(1, episodes+1, desc="Training Episodes")
+    else:
+        episode_iterator = range(1, episodes+1)
+    for _ in episode_iterator:
         # Reset environment to start a new episode
         observation, info = env.reset()
         observation = _discretize(observation)
@@ -65,8 +74,7 @@ def _loop(agents: list[Agent], env, episodes: int=1000, progress_bar=True) -> No
         while not episode_over:
             agent = agents[turn]
             turn = (turn + 1) % len(agents)
-            # Choose an action: 0 = push cart left, 1 = push cart right
-            action = agent.select_action(env.action_space, env.observation_space, observation)  # Random action for now - real agents will be smarter!
+            action = agent.select_action(env.action_space, observation)
             prior_observation = observation
 
             # Take the action and see what happens
@@ -74,15 +82,12 @@ def _loop(agents: list[Agent], env, episodes: int=1000, progress_bar=True) -> No
             observation = _discretize(observation)
             agent.learn(prior_observation, observation, action, reward, terminated or truncated)
             steps += 1
-            #print(f"Observation: {observation}, Reward: {reward}, Terminated: {terminated}, Truncated: {truncated}")
-
-            # reward: +1 for each step the pole stays upright
-            # terminated: True if pole falls too far (agent failed)
-            # truncated: True if we hit the time limit (500 steps)
 
             total_reward += reward
             episode_over = terminated or truncated
+            logger.debug(f"Observation: {observation}, Reward: {reward}, Terminated: {terminated}, Truncated: {truncated}")
 
-        agent.end_episode()
+        for agent in agents:
+            agent.end_episode()
     env.close()
     time.sleep(1)
