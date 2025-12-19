@@ -1,7 +1,11 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
+
 import numpy as np
+
+from logging import getLogger
+logger = getLogger(__name__)
 
 ACTION_POLICY_REGISTRY: dict[str, ActionPolicy] = {}
 
@@ -36,5 +40,7 @@ class RandomActionPolicy(ActionPolicy):
 @_register_action_policy
 class GreedyPolicy(ActionPolicy):
     def act(self, action_space: Any, observation: Any, action_space_values: Any) -> Any:
-        action = np.argmax(action_space_values)
-        return action
+        logger.info(f"GreedyPolicy selecting action with values: {action_space_values}")
+        best_action = max(action_space_values, key=action_space_values.get)  # gives 6 for your example
+        logger.info(f"GreedyPolicy selected action: {best_action}")
+        return best_action

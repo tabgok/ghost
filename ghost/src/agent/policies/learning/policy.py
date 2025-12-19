@@ -34,7 +34,7 @@ class LearningPolicy(ABC):
 class NoOpLearningPolicy(LearningPolicy):
     """A policy that does not learn."""
 
-    def values(self, observation) -> dict[int, float]:
+    def values(self, observation, action_space) -> dict[int, float]:
         """Return empty values for all actions."""
         return {}
     
@@ -48,32 +48,28 @@ class NoOpLearningPolicy(LearningPolicy):
         pass
 
 
-
-
-
 @_register_learning_policy
 class MonteCarloLearningPolicy(LearningPolicy):
     """A simple Monte Carlo learning policy."""
     def __init__(self):
         self.q_table = defaultdict(float)
-        self.states = []
+        self.state_history = []
         self.alpha = 0.1 # Learning rate, which is a proxy for "average" so we don't have to keep track of N
         self.gamma = 0.8 # Discount factor, which is a weight on future rewards
 
     def reset(self):
-        self.states = []
+        self.state_history = []
 
     def learn(self, prior_observation, observation, action, reward, done) -> None:
         # Store the transitions and rewards
-        obs_hash = hash(observation.tobytes())
         prior_obs_hash = hash(prior_observation.tobytes())
-        self.states.append((prior_obs_hash, obs_hash, action, reward))
+        self.state_history.append((prior_obs_hash, action, reward))
     
-    def values(self, observation) -> dict[int, float]:
+    def values(self, observation, action_space) -> dict[int, float]:
         """Return the learned values for each action in the given observation."""
         obs_hash = hash(observation.tobytes())
         action_values = {}
-        for action in range(0,  observation.shape[0]):  # Assuming discrete actions from 0 to n-1
+        for action in action_space.available_actions():
             entry = (obs_hash, action)
             action_values[action] = self.q_table[entry]
         return action_values
@@ -81,7 +77,7 @@ class MonteCarloLearningPolicy(LearningPolicy):
     def end_episode(self) -> None:
         """Handle end of episode updates."""
         G = 0
-        for prior_observation, _, last_action, reward in reversed(self.states):
+        for prior_observation, last_action, reward in reversed(self.state_history):
             G = reward + self.gamma * G
             entry = (prior_observation, last_action)
             cur_value = self.q_table[entry]

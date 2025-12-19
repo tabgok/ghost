@@ -52,7 +52,7 @@ class _AvailableMovesSpace(gym.spaces.Space):
     def available_actions(self) -> list[int]:
         empties = np.argwhere(self.env._board == 0)
         return [int(r * 3 + c) for r, c in empties]
-
+    
     @property
     def human_options(self) -> dict:
         """Return data useful for human-readable prompts."""

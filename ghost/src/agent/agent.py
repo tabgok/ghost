@@ -19,7 +19,7 @@ class Agent:
         self.exploration_policy = exploration_policy()
 
     def select_action(self, action_space, observation):
-        learned_values = self.learning_policy.values(observation)
+        learned_values = self.learning_policy.values(observation, action_space)
         action = self.action_policy.act(action_space, observation, learned_values)
         action = self.exploration_policy.explore(action, action_space)
         return action

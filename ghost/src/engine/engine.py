@@ -24,6 +24,7 @@ def train(agent_names: tuple[str], environment: str, episodes: int) -> None:
     env = environment_manager.instantiate_environment(environment)
     _loop(agents, env, episodes=episodes, progress_bar=True)
     env = environment_manager.instantiate_environment(environment, render_mode="human")
+    getLogger(("root")).setLevel("DEBUG")
     _loop(agents, env, episodes=1, progress_bar=False)
 
 
@@ -48,7 +49,7 @@ def _discretize(obs):
     Convert a continuous 4D CartPole observation into a discrete state tuple.
     
     Parameters:
-        obs (array-like): [cart position, cart velocity, pole angle, pole angular velocity]
+        obs (array-like): [cart position, cart velocity, pole angle, pole angular velocGity]
     
     Returns:
     """
@@ -58,6 +59,8 @@ def _discretize(obs):
 def _loop(agents: list[Agent], env, episodes: int=1000, progress_bar=True) -> None:
     if progress_bar:
         from tqdm import trange
+        import logging
+        logging.getLogger("root").setLevel(logging.ERROR)
         episode_iterator = trange(1, episodes+1, desc="Training Episodes")
     else:
         episode_iterator = range(1, episodes+1)
