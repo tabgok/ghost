@@ -22,7 +22,36 @@ def train(agent_names: tuple[str], environment: str, episodes: int) -> None:
     # Load the environment
     logger.debug(f"Loading environment: {environment}")
     env = environment_manager.instantiate_environment(environment)
-    _loop(agents, env, episodes=episodes, progress_bar=True)
+    returns = _loop(agents, env, episodes=episodes, progress_bar=True)
+    try:
+        import matplotlib.pyplot as plt
+        import numpy as np
+    except Exception as exc:
+        logger.warning("Could not import matplotlib/numpy to plot returns: %s", exc)
+    else:
+        plt.figure()
+        window = max(10, episodes // 100)  # ~1% smoothing window
+        for agent_name, trajectory in returns.items():
+            traj = np.asarray(trajectory, dtype=float)
+            if traj.size == 0:
+                continue
+            # scatter a sparse sample of raw returns to show variance
+            stride = max(1, traj.size // 200)
+            plt.scatter(np.arange(0, traj.size, stride), traj[::stride], s=8, alpha=0.2)
+            if traj.size >= window:
+                kernel = np.ones(window, dtype=float) / float(window)
+                smooth = np.convolve(traj, kernel, mode="valid")
+                x = np.arange(smooth.size) + window // 2
+                plt.plot(x, smooth, label=f"{agent_name} (mean {window})")
+            else:
+                plt.plot(traj, label=agent_name)
+        plt.xlabel("Episode")
+        plt.ylabel("Return")
+        plt.title("Training episode returns (smoothed)")
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
     env = environment_manager.instantiate_environment(environment, render_mode="human")
     getLogger(("root")).setLevel("DEBUG")
     _loop(agents, env, episodes=1, progress_bar=False)
@@ -56,7 +85,7 @@ def _discretize(obs):
     return obs
 
 
-def _loop(agents: list[Agent], env, episodes: int=1000, progress_bar=True) -> None:
+def _loop(agents: list[Agent], env, episodes: int=1000, progress_bar=True) -> dict[str, list[float]]:
     if progress_bar:
         from tqdm import trange
         import logging
@@ -64,15 +93,16 @@ def _loop(agents: list[Agent], env, episodes: int=1000, progress_bar=True) -> No
         episode_iterator = trange(1, episodes+1, desc="Training Episodes")
     else:
         episode_iterator = range(1, episodes+1)
+    episode_returns: dict[str, list[float]] = {agent.name: [] for agent in agents}
     for _ in episode_iterator:
         # Reset environment to start a new episode
         observation, info = env.reset()
         observation = _discretize(observation)
 
         episode_over = False
-        total_reward = 0
         reward = 0
         steps = 0
+        per_agent_return = [0.0 for _ in agents]
         turn = 0
         while not episode_over:
             agent = agents[turn]
@@ -86,11 +116,14 @@ def _loop(agents: list[Agent], env, episodes: int=1000, progress_bar=True) -> No
             agent.learn(prior_observation, observation, action, reward, terminated or truncated)
             steps += 1
 
-            total_reward += reward
+            per_agent_return[(turn - 1) % len(agents)] += reward
             episode_over = terminated or truncated
             logger.debug(f"Observation: {observation}, Reward: {reward}, Terminated: {terminated}, Truncated: {truncated}")
 
         for agent in agents:
             agent.end_episode()
+        for idx, agent in enumerate(agents):
+            episode_returns[agent.name].append(per_agent_return[idx])
     env.close()
     time.sleep(1)
+    return episode_returns
