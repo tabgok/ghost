@@ -125,5 +125,6 @@ def _loop(agents: list[Agent], env, episodes: int=1000, progress_bar=True) -> di
         for idx, agent in enumerate(agents):
             episode_returns[agent.name].append(per_agent_return[idx])
     env.close()
-    time.sleep(1)
+    if not progress_bar:
+        input("Press Enter to continue...")
     return episode_returns
