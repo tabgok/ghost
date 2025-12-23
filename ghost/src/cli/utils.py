@@ -1,22 +1,11 @@
 from __future__ import annotations
 
 import click
-import yaml
 import gymnasium as gym
 
-from agent.policies.action.random import RandomPolicy
-from agent.policies.action.policy import HumanActionPolicy
-from agent.policies.action.qvalue import QValuePolicy
-from agent.policies.learning.qlearning import TabularQLearningPolicy
 from envs.custom.tictactoe import TicTacToeEnv
-import engine
 
-DEFAULT_ACTION_POLICY = "random"
-DEFAULT_EXPLORATION_POLICY = "epsilon_greedy"
-DEFAULT_LEARNING_POLICY = "noop"
-AVAILABLE_ENVS = ["tictactoe", "cartpole", "lunar_lander"]  # TODO: Refactor this, and the below, so there is a registry
-LEARNING_POLICIES = [DEFAULT_LEARNING_POLICY, "tabular_q"]
-
+AVAILABLE_ENVS = ["tictactoe", "cartpole", "lunar_lander"]
 
 
 def make_env(env_name: str, render_mode: str, two_players: bool = False):
