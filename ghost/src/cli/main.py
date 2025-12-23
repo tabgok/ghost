@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import click
 
-from cli.run import run
 from cli.train import train
 from cli.evaluate import evaluate
 
@@ -19,7 +18,6 @@ def ghost() -> None:
     """Base Ghost CLI group."""
 
 
-ghost.add_command(run)
 ghost.add_command(train)
 ghost.add_command(evaluate)
 

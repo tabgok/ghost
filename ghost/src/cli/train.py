@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import time
 import click
 
 import engine
-from engine import environment_manager
 
 @click.command("train", help="Train an agent in a specified environment.")
 @click.option(

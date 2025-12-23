@@ -14,3 +14,5 @@ from .environment_manager import (
     list_environments,
     register_environment
 )
+
+from envs.custom.tictactoe import TicTacToeEnv
