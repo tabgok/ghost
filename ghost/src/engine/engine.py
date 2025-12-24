@@ -13,13 +13,13 @@ logging.basicConfig(level=logging.ERROR)  # or WARNING
 
 
 
-def run(agent_names: tuple[str], environment: str, episodes: int, plot: bool, show_progress: bool) -> None:
-    logger.info(f"Running agents {agent_names} in environment {environment} for {episodes} episodes.")
+def run(agent_info: list[dict], environment: str, episodes: int, plot: bool, show_progress: bool) -> None:
+    logger.info(f"Running agents {[agent['name'] for agent in agent_info]} in environment {environment} for {episodes} episodes.")
 
     agents = []
-    for agent in agent_names:
-        logger.debug(f"Loading agent: {agent}")
-        agent = agent_manager.AGENT_REGISTRY[agent]()
+    for agent in agent_info:
+        logger.debug(f"Loading agent: {agent['name']}")
+        agent = agent_manager.AGENT_REGISTRY[agent["name"]](**agent)
         agents.append(agent)
     # Load the environment
     logger.debug(f"Loading environment: {environment}")

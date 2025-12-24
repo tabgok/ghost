@@ -35,7 +35,6 @@ class Agent:
 
 
     def snapshot(self) -> dict:
-        breakpoint()
         return {
             "name": self.name,
             "learning_policy": self.learning_policy.snapshot(),

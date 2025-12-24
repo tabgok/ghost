@@ -14,21 +14,13 @@ def list_agents() -> list[str]:
     return list(AGENT_REGISTRY.keys())
 
 
-def describe_agent(agent_name: str) -> dict[str, dict]:
-    details = {}
-    if agent_name not in AGENT_REGISTRY:
-        raise NameError(f"Agent '{agent_name}' is not registered.")
-
-    details = AGENT_REGISTRY[agent_name].snapshot()
-    return details
-
 def register_agent(agent: Agent) -> None:
     AGENT_REGISTRY[agent.__name__] = agent
 
 
 @register_agent
 class HumanAgent(Agent):
-    def __init__(self) -> None:
+    def __init__(self, name: str = "HumanAgent") -> None:
         super().__init__(
             name="HumanAgent",
             learning_policy=LEARNING_POLICY_REGISTRY["NoOpLearningPolicy"],
@@ -39,7 +31,7 @@ class HumanAgent(Agent):
 
 @register_agent
 class RandomAgent(Agent):
-    def __init__(self) -> None:
+    def __init__(self, name: str = "RandomAgent") -> None:
         super().__init__(
             name="RandomAgent",
             learning_policy=LEARNING_POLICY_REGISTRY["NoOpLearningPolicy"],
@@ -50,7 +42,7 @@ class RandomAgent(Agent):
 
 @register_agent
 class GreedyAgent(Agent):
-    def __init__(self) -> None:
+    def __init__(self, name: str = "GreedyAgent") -> None:
         super().__init__(
             name="GreedyAgent",
             learning_policy=LEARNING_POLICY_REGISTRY["NoOpLearningPolicy"],
@@ -61,7 +53,7 @@ class GreedyAgent(Agent):
 
 @register_agent
 class MonteCarloAgent(Agent):
-    def __init__(self) -> None:
+    def __init__(self, name: str = "MonteCarloAgent", save_file: str = None) -> None:
         super().__init__(
             name="MonteCarloAgent",
             learning_policy=LEARNING_POLICY_REGISTRY["MonteCarloLearningPolicy"],

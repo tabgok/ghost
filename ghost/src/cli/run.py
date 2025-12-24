@@ -28,7 +28,10 @@ import engine
 def run() -> None:
     sample_run = {
         "environment": "TicTacToe",
-        "agents": ("MonteCarloAgent", "RandomAgent"),
+        "agents": [
+            {"name": "MonteCarloAgent", "save_file": "monte_carlo_agent.pkl"}, 
+            {"name": "RandomAgent"},
+        ],
         "episodes": 100000,
         "render_mode": "None",
         "plot_learning_curve": False,

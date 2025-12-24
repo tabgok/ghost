@@ -3,7 +3,6 @@ from .engine import (
 )
 
 from .agent_manager import (
-    describe_agent,
     list_agents,
 )
 
