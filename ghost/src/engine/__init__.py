@@ -1,6 +1,5 @@
 from .engine import (
-    train,
-    evaluate
+    run
 )
 
 from .agent_manager import (

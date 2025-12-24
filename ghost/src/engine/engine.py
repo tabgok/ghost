@@ -1,18 +1,20 @@
-import time
-from logging import getLogger
-import tqdm
+import logging
+import matplotlib.pyplot as plt
+import numpy as np
+from tqdm import trange
 
 
-from agent.agent import Agent
 from engine import environment_manager
 from engine import agent_manager
 
-logger = getLogger(__name__)
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.ERROR)  # or WARNING
 
 
-### --- TRAINING --- ###
-def train(agent_names: tuple[str], environment: str, episodes: int) -> None:
-    logger.info(f"Training agents {agent_names} in environment {environment} for {episodes} episodes.")
+
+
+def run(agent_names: tuple[str], environment: str, episodes: int, plot: bool, show_progress: bool) -> None:
+    logger.info(f"Running agents {agent_names} in environment {environment} for {episodes} episodes.")
 
     agents = []
     for agent in agent_names:
@@ -22,77 +24,11 @@ def train(agent_names: tuple[str], environment: str, episodes: int) -> None:
     # Load the environment
     logger.debug(f"Loading environment: {environment}")
     env = environment_manager.instantiate_environment(environment)
-    returns = _loop(agents, env, episodes=episodes, progress_bar=True)
-    try:
-        import matplotlib.pyplot as plt
-        import numpy as np
-    except Exception as exc:
-        logger.warning("Could not import matplotlib/numpy to plot returns: %s", exc)
-    else:
-        plt.figure()
-        window = max(10, episodes // 100)  # ~1% smoothing window
-        for agent_name, trajectory in returns.items():
-            traj = np.asarray(trajectory, dtype=float)
-            if traj.size == 0:
-                continue
-            # scatter a sparse sample of raw returns to show variance
-            stride = max(1, traj.size // 200)
-            plt.scatter(np.arange(0, traj.size, stride), traj[::stride], s=8, alpha=0.2)
-            if traj.size >= window:
-                kernel = np.ones(window, dtype=float) / float(window)
-                smooth = np.convolve(traj, kernel, mode="valid")
-                x = np.arange(smooth.size) + window // 2
-                plt.plot(x, smooth, label=f"{agent_name} (mean {window})")
-            else:
-                plt.plot(traj, label=agent_name)
-        plt.xlabel("Episode")
-        plt.ylabel("Return")
-        plt.title("Training episode returns (smoothed)")
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-
-    env = environment_manager.instantiate_environment(environment, render_mode="human")
-    getLogger(("root")).setLevel("DEBUG")
-    _loop(agents, env, episodes=1, progress_bar=False)
-
-
-def evaluate(agent_names: tuple[str], environment: str) -> None:
-    logger.info(f"Evaluating agents {agent_names} in environment {environment}.")
-
-    # Load the agent(s)
-    agents = []
-    for agent in agent_names:
-        logger.debug(f"Loading agent: {agent}")
-        agent = agent_manager.AGENT_REGISTRY[agent]()
-        agents.append(agent)
-
-    # Load the environment
-    logger.debug(f"Loading environment: {environment}")
-    env = environment_manager.instantiate_environment(environment, render_mode="human")
-    _loop(agents, env, episodes=1, progress_bar=False)
-
-
-def _discretize(obs):
-    """
-    Convert a continuous 4D CartPole observation into a discrete state tuple.
-    
-    Parameters:
-        obs (array-like): [cart position, cart velocity, pole angle, pole angular velocGity]
-    
-    Returns:
-    """
-    return obs
-
-
-def _loop(agents: list[Agent], env, episodes: int=1000, progress_bar=True) -> dict[str, list[float]]:
-    if progress_bar:
-        from tqdm import trange
-        import logging
-        logging.getLogger("root").setLevel(logging.ERROR)
+    episode_iterator = None
+    if show_progress:
         episode_iterator = trange(1, episodes+1, desc="Training Episodes")
     else:
-        episode_iterator = range(1, episodes+1)
+        episode_iterator = range(1, episodes+1)  # disable progress bar for now
     episode_returns: dict[str, list[float]] = {agent.name: [] for agent in agents}
     for _ in episode_iterator:
         # Reset environment to start a new episode
@@ -125,6 +61,54 @@ def _loop(agents: list[Agent], env, episodes: int=1000, progress_bar=True) -> di
         for idx, agent in enumerate(agents):
             episode_returns[agent.name].append(per_agent_return[idx])
     env.close()
-    if not progress_bar:
-        input("Press Enter to continue...")
-    return episode_returns
+    logger.debug(episode_returns)
+    if plot:
+        plot_learning_curve(episode_returns)
+
+
+def plot_learning_curve(returns: dict[str, list[float]]) -> None:
+    fig, ax = plt.subplots(1)
+    plt.show(block=False)
+    plt.pause(1)
+    episodes = len(next(iter(returns.values())))
+    window = max(10, episodes // 100)  # ~1% smoothing window
+    for agent_name, trajectory in returns.items():
+        traj = np.asarray(trajectory, dtype=float)
+        if traj.size == 0:
+            continue
+        # scatter a sparse sample of raw returns to show variance
+        stride = max(1, traj.size // 200)
+        ax.scatter(np.arange(0, traj.size, stride), traj[::stride], s=8, alpha=0.2)
+        if traj.size >= window:
+            kernel = np.ones(window, dtype=float) / float(window)
+            smooth = np.convolve(traj, kernel, mode="valid")
+            x = np.arange(smooth.size) + window // 2
+            ax.plot(x, smooth, label=f"{agent_name} (mean {window})")
+        else:
+            ax.plot(traj, label=agent_name)
+    ax.set_xlabel("Episode")
+    ax.set_ylabel("Return")
+    ax.set_title("Training episode returns (smoothed)")
+    ax.legend()
+    manager = plt.get_current_fig_manager()
+    if hasattr(manager, "window") and hasattr(manager.window, "wm_geometry"):
+        manager.window.wm_geometry("1200x800")
+        def _resize_to_window(event) -> None:
+            if event.width <= 0 or event.height <= 0:
+                return
+            fig.set_size_inches(event.width / fig.dpi, event.height / fig.dpi, forward=True)
+            fig.canvas.draw_idle()
+        manager.window.bind("<Configure>", _resize_to_window)
+    plt.show()
+
+
+def _discretize(obs):
+    """
+    Convert a continuous 4D CartPole observation into a discrete state tuple.
+    
+    Parameters:
+        obs (array-like): [cart position, cart velocity, pole angle, pole angular velocGity]
+    
+    Returns:
+    """
+    return obs

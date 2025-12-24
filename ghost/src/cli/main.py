@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import click
 
-from cli.train import train
-from cli.evaluate import evaluate
+from cli.run import run 
 
 from logging import basicConfig, DEBUG
 FORMATTER = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -18,8 +17,7 @@ def ghost() -> None:
     """Base Ghost CLI group."""
 
 
-ghost.add_command(train)
-ghost.add_command(evaluate)
+ghost.add_command(run)
 
 
 def main() -> None:

@@ -39,8 +39,11 @@ class RandomActionPolicy(ActionPolicy):
 
 @_register_action_policy
 class GreedyPolicy(ActionPolicy):
-    def act(self, action_space: Any, observation: Any, action_space_values: Any) -> Any:
-        logger.info(f"GreedyPolicy selecting action with values: {action_space_values}")
-        best_action = max(action_space_values, key=action_space_values.get)  # gives 6 for your example
+    def act(self, action_space: Any, observation: Any, learned_values: Any) -> Any:
+        logger.info(f"GreedyPolicy selecting action with values: {learned_values}")
+        if not learned_values:
+            logger.warning("No learned values provided; using random action.")
+            return action_space.sample()
+        best_action = max(learned_values, key=learned_values.get)  # gives 6 for your example
         logger.info(f"GreedyPolicy selected action: {best_action}")
         return best_action
