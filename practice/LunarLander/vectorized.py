@@ -22,7 +22,6 @@ def run(
     model_path: Path = Path("q_model.pkl"),
     fresh: bool = False,
     eval_only: bool = False,
-    demos_per_run: int = 1,
     total_episodes: int = 500000,
     num_envs: int = 1,
 ):
@@ -104,22 +103,20 @@ def run(
 
     env.close()
 
-    if demos_per_run > 0:
-        # Render evaluation episodes with the learned policy.
-        demo_env = make_env(render_mode="human")()
-        # Greedy run for the demo.
-        agent.exploration_rate = 0.0
-        for _ in range(demos_per_run):
-            demo_obs, _ = demo_env.reset()
-            done = False
-            demo_return = 0.0
-            while not done:
-                action = agent.select_action(demo_env.action_space, demo_obs)
-                demo_obs, reward, terminated, truncated, _ = demo_env.step(action)
-                demo_return += reward
-                done = terminated or truncated
-            print(f"Demo episode return: {demo_return}")
-        demo_env.close()
+    # Render a single evaluation episode with the learned policy.
+    demo_env = make_env(render_mode="human")()
+    # Greedy run for the demo.
+    agent.exploration_rate = 0.0
+    demo_obs, _ = demo_env.reset()
+    done = False
+    demo_return = 0.0
+    while not done:
+        action = agent.select_action(demo_env.action_space, demo_obs)
+        demo_obs, reward, terminated, truncated, _ = demo_env.step(action)
+        demo_return += reward
+        done = terminated or truncated
+    print(f"Demo episode return: {demo_return}")
+    demo_env.close()
 
     # Persist the learned table.
     if not eval_only:
@@ -159,7 +156,6 @@ if __name__ == "__main__":
         model_path=Path(args.model_path),
         fresh=args.fresh,
         eval_only=args.eval_only,
-        demos_per_run=args.demos_per_run,
         total_episodes=args.episodes,
         num_envs=args.num_envs,
     )

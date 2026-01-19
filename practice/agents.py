@@ -27,14 +27,15 @@ class TabularQAgent():
             return action_space.sample()
         else:
             state_space = self.discretize(observation)
-            m = -1*math.inf
-            action = -1
+            best_val = -1 * math.inf
+            best_action = -1
+            state_action = self.state_action
             for i in range(action_space.n):
-                val = self.state_action[(state_space, i)]
-                if val > m:
-                    m = val
-                    action = i
-            return action
+                val = state_action[(state_space, i)]
+                if val > best_val:
+                    best_val = val
+                    best_action = i
+            return best_action
     
     def update(self, reward, last_observation, last_action, current_observation, done):
         self.updates += 1
@@ -42,9 +43,19 @@ class TabularQAgent():
         current_state_space = self.discretize(current_observation)
         state_action_space = (last_state_space, last_action)
         # last = last + learning_rate * (reward + discount_factor*max_current - last)
-        last = self.state_action[state_action_space]
-        max_current = 0.0 if done else max(self.state_action[(current_state_space, i)] for i in range(self.action_space.n))
-        self.state_action[state_action_space] = last + self.step_size*(reward + self.discount_factor*max_current - last)
+        state_action = self.state_action
+        last = state_action[state_action_space]
+        if done:
+            max_current = 0.0
+        else:
+            max_current = -1 * math.inf
+            for i in range(self.action_space.n):
+                val = state_action[(current_state_space, i)]
+                if val > max_current:
+                    max_current = val
+        state_action[state_action_space] = last + self.step_size * (
+            reward + self.discount_factor * max_current - last
+        )
 
     def _make_buckets(self, n_bins=40):
         self.dimensions = self.observation_space.shape[0]
@@ -61,7 +72,10 @@ class TabularQAgent():
         # Digitize turns values into bin indices
         #obs_arr = np.asarray(observation)
         #5return tuple(np.digitize(observation[i], self.bins[i]) for i in range(self.dimensions))
-        obs_arr = np.asarray(observation)
+        if isinstance(observation, np.ndarray):
+            obs_arr = observation
+        else:
+            obs_arr = np.asarray(observation)
         # vectorized search: still loops in Python over dims but avoids generator overhead
         #return tuple(np.searchsorted(self.bin_edges[i], obs_arr[i], side='right') for i in range(self.dimensions))
         return tuple(discretize_jit(obs_arr, self.bin_edges))

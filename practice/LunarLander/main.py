@@ -21,15 +21,27 @@ def main(
     model_path: Path = Path("q_model.pkl"),
     fresh: bool = False,
     eval_only: bool = False,
-    demos_per_run: int = 1,
     total_episodes: int = 1000000,
 ):
     episodes = total_episodes
     display_count = 10
+    display_every = episodes // display_count if display_count else None
+    if display_every == 0:
+        display_every = 1
 
-    render_mode = None
-    env = gym.make("LunarLander-v3", continuous=False, gravity=-10.0,
-            enable_wind=False, wind_power=15.0, turbulence_power=1.5, render_mode=render_mode)
+    def make_env(render_mode=None):
+        return gym.make(
+            "LunarLander-v3",
+            continuous=False,
+            gravity=-10.0,
+            enable_wind=False,
+            wind_power=15.0,
+            turbulence_power=1.5,
+            render_mode=render_mode,
+        )
+
+    env = make_env()
+    render_env = None
     rewards = []
     #agent = RandomAgent(env.observation_space, env.action_space)
     agent = TabularQAgent(env.observation_space, env.action_space)
@@ -38,23 +50,8 @@ def main(
     last_exploration_rate = 0
     bucket_reward = 0
 
-    global demos_so_far
-    demos_so_far = 0
     def demo_episode():
-        global demos_so_far
-        print(f"Starting demo episode {demos_so_far + 1} of {demos_per_run}")
-        if demos_so_far <= demos_per_run:
-            return
-        demos_so_far += 1
-        demo_env = gym.make(
-            "LunarLander-v3",
-            continuous=False,
-            gravity=-10.0,
-            enable_wind=False,
-            wind_power=15.0,
-            turbulence_power=1.5,
-            render_mode="human",
-        )
+        demo_env = make_env(render_mode="human")
         agent.exploration_rate = 0.0
         demo_obs, _ = demo_env.reset()
         done = False
@@ -67,23 +64,13 @@ def main(
         demo_env.close()
 
     if eval_only:
-        if demos_per_run > demos_so_far:
-            demo_episode()
+        demo_episode()
         return
 
     def rollout():
-        nonlocal env, last_exploration_rate, bucket_reward
+        nonlocal render_env, last_exploration_rate, bucket_reward
         for episode in tqdm.trange(episodes, desc="Episodes"):
             episode_reward = 0
-            env = gym.make(
-                "LunarLander-v3",
-                continuous=False,
-                gravity=-10.0,
-                enable_wind=False,
-                wind_power=15.0,
-                turbulence_power=1.5,
-                render_mode=render_mode,
-            )
 
             last_observation, info = env.reset()
 
@@ -96,13 +83,11 @@ def main(
                 episode_reward += reward
                 agent.update(reward, last_observation, last_action, current_observation, episode_over)
                 last_observation = current_observation
-            if display_count and (episode % (episodes // 10) == 0):
-                agent.exploration_rate = last_exploration_rate
-                #print(f"Evaluation run reward: {episode_reward}, final reward: {reward}, agent memsize: {len(agent.state_action.keys())}, exploration rate: {agent.exploration_rate}")
             rewards.append(episode_reward)
             bucket_reward += episode_reward
-            env.close()
-        demo_episode()
+        env.close()
+        if render_env is not None:
+            render_env.close()
 
     if profile_enabled:
         with cProfile.Profile() as pr:
@@ -146,6 +131,5 @@ if __name__ == "__main__":
         model_path=Path(args.model_path),
         fresh=args.fresh,
         eval_only=args.eval_only,
-        demos_per_run=args.demos_per_run,
         total_episodes=args.episodes,
     )
