@@ -1,139 +1,119 @@
 import gymnasium as gym
-import random
 import numpy as np
 import matplotlib.pyplot as plt
-from collections import defaultdict
-import math
 import tqdm
 import cProfile
 import pstats
-import numba as nb
+from pathlib import Path
+import sys
 
-class RandomAgent:
-    def __init__(self, args, kwargs):
-        self.exploration_rate = 0
-        self.state_action = dict()
-    
-    def select_action(self, action_space, observation):
-        return action_space.sample()
+# Allow imports from the parent project directory.
+PARENT_DIR = Path(__file__).resolve().parents[1]
+if str(PARENT_DIR) not in sys.path:
+    sys.path.insert(0, str(PARENT_DIR))
 
-    def update(self, reward, last_observation, last_action, current_observation, done):
-        pass
-
-rng = np.random.default_rng()
-
-@nb.njit
-def discretize_jit(obs, edges):
-    out = np.empty(obs.shape[0], dtype=np.int64)
-    for i in range(obs.shape[0]):
-        out[i] = np.searchsorted(edges[i], obs[i], side='right')
-    return out
-
-class QAgent():
-    def __init__(self, observation_space=None, action_space=None):
-        self.state_action = defaultdict(float)
-        self.step_size = 0.1  # How quickly we learn (how much impact the reward has on update, 1 is full replacement)
-        self.exploration_rate = 0.8  # How much we explore (initially)
-        self.exploration_rate_min = 0.01  # Minimum exploration rate
-        self.exploration_rate_decay = 0.999  # How quickly we lower the exploration rate
-        self.discount_factor = 0.99   # How much we care about future values
-        self.observation_space = observation_space
-        self.action_space = action_space
-        self._make_buckets()
-
-    def select_action(self, action_space, observation):
-        if rng.random() < self.exploration_rate:
-            self.exploration_rate *= self.exploration_rate_decay
-            self.exploration_rate = max(self.exploration_rate_min, self.exploration_rate)
-            return action_space.sample()
-        else:
-            state_space = self.discretize(observation)
-            m = -1*math.inf
-            action = -1
-            for i in range(action_space.n):
-                val = self.state_action[(state_space, i)]
-                if val > m:
-                    m = val
-                    action = i
-            return action
-    
-    def update(self, reward, last_observation, last_action, current_observation, done):
-        last_state_space = self.discretize(last_observation)
-        current_state_space = self.discretize(current_observation)
-        state_action_space = (last_state_space, last_action)
-        # last = last + learning_rate * (reward + discount_factor*max_current - last)
-        last = self.state_action[state_action_space]
-        max_current = 0.0 if done else max(self.state_action[(current_state_space, i)] for i in range(self.action_space.n))
-        self.state_action[state_action_space] = last + self.step_size*(reward + self.discount_factor*max_current - last)
-
-    def _make_buckets(self, n_bins=10):
-        self.dimensions = self.observation_space.shape[0]
-        bins_per_dimension = n_bins#int(math.pow(n_bins, 1./self.dimensions))
-        self.bins = []
-        for dimension in range(self.dimensions):
-            low = self.observation_space.low[dimension]
-            high = self.observation_space.high[dimension]
-            # linspace turns a range into bins
-            self.bins.append(np.linspace(low, high, num=bins_per_dimension))
-        self.bin_edges = np.asarray(self.bins)
-            
-    def discretize(self, observation):
-        # Digitize turns values into bin indices
-        #obs_arr = np.asarray(observation)
-        #5return tuple(np.digitize(observation[i], self.bins[i]) for i in range(self.dimensions))
-        obs_arr = np.asarray(observation)
-        # vectorized search: still loops in Python over dims but avoids generator overhead
-        #return tuple(np.searchsorted(self.bin_edges[i], obs_arr[i], side='right') for i in range(self.dimensions))
-        return tuple(discretize_jit(obs_arr, self.bin_edges))
+from agents import TabularQAgent
+from cli import build_parser
 
 
-def main():
-    episodes = 1000
+def main(
+    profile_enabled: bool = False,
+    model_path: Path = Path("q_model.pkl"),
+    fresh: bool = False,
+    eval_only: bool = False,
+    demos_per_run: int = 1,
+    total_episodes: int = 1000000,
+):
+    episodes = total_episodes
     display_count = 10
 
     render_mode = None
     env = gym.make("LunarLander-v3", continuous=False, gravity=-10.0,
             enable_wind=False, wind_power=15.0, turbulence_power=1.5, render_mode=render_mode)
     rewards = []
-    agent = RandomAgent(env.observation_space, env.action_space)
+    #agent = RandomAgent(env.observation_space, env.action_space)
+    agent = TabularQAgent(env.observation_space, env.action_space)
+    if not fresh and model_path.exists():
+        agent.load(model_path)
     last_exploration_rate = 0
     bucket_reward = 0
 
-    #with cProfile.Profile() as pr:
-    for episode in tqdm.trange(episodes, desc="Episodes"):
-        episode_reward = 0
-        if display_count and (episode % (episodes//display_count) == 0):
-            render_mode = "human"
-            bucket_reward = 0
-            last_exploration_rate = agent.exploration_rate
-            agent.exploration_rate = 0.0
-        else:
-            render_mode = None
-        env = gym.make("LunarLander-v3", continuous=False, gravity=-10.0,
-                enable_wind=False, wind_power=15.0, turbulence_power=1.5, render_mode=render_mode)
+    global demos_so_far
+    demos_so_far = 0
+    def demo_episode():
+        global demos_so_far
+        print(f"Starting demo episode {demos_so_far + 1} of {demos_per_run}")
+        if demos_so_far <= demos_per_run:
+            return
+        demos_so_far += 1
+        demo_env = gym.make(
+            "LunarLander-v3",
+            continuous=False,
+            gravity=-10.0,
+            enable_wind=False,
+            wind_power=15.0,
+            turbulence_power=1.5,
+            render_mode="human",
+        )
+        agent.exploration_rate = 0.0
+        demo_obs, _ = demo_env.reset()
+        done = False
+        demo_return = 0.0
+        while not done:
+            action = agent.select_action(demo_env.action_space, demo_obs)
+            demo_obs, reward, terminated, truncated, _ = demo_env.step(action)
+            demo_return += reward
+            done = terminated or truncated
+        demo_env.close()
 
-        last_observation, info = env.reset()
+    if eval_only:
+        if demos_per_run > demos_so_far:
+            demo_episode()
+        return
 
-        episode_over = False
+    def rollout():
+        nonlocal env, last_exploration_rate, bucket_reward
+        for episode in tqdm.trange(episodes, desc="Episodes"):
+            episode_reward = 0
+            env = gym.make(
+                "LunarLander-v3",
+                continuous=False,
+                gravity=-10.0,
+                enable_wind=False,
+                wind_power=15.0,
+                turbulence_power=1.5,
+                render_mode=render_mode,
+            )
 
-        while not episode_over:
-            last_action = agent.select_action(env.action_space, last_observation)
-            current_observation, reward, terminated, truncated, info = env.step(last_action)
-            episode_over = terminated or truncated
-            episode_reward += reward
-            agent.update(reward, last_observation, last_action, current_observation, episode_over)
-            last_observation = current_observation
-        if display_count and (episode % (episodes//10) == 0):
-            agent.exploration_rate = last_exploration_rate
-            print(f"Evaluation run reward: {episode_reward}, final reward: {reward}, agent memsize: {len(agent.state_action.keys())}, exploration rate: {agent.exploration_rate}")
-        rewards.append(episode_reward)
-        #print(episode, episode_reward)
-        bucket_reward += episode_reward
-        env.close()
-        #stats = pstats.Stats(pr)
-        #stats.sort_stats("cumtime").print_stats(40)
+            last_observation, info = env.reset()
+
+            episode_over = False
+
+            while not episode_over:
+                last_action = agent.select_action(env.action_space, last_observation)
+                current_observation, reward, terminated, truncated, info = env.step(last_action)
+                episode_over = terminated or truncated
+                episode_reward += reward
+                agent.update(reward, last_observation, last_action, current_observation, episode_over)
+                last_observation = current_observation
+            if display_count and (episode % (episodes // 10) == 0):
+                agent.exploration_rate = last_exploration_rate
+                #print(f"Evaluation run reward: {episode_reward}, final reward: {reward}, agent memsize: {len(agent.state_action.keys())}, exploration rate: {agent.exploration_rate}")
+            rewards.append(episode_reward)
+            bucket_reward += episode_reward
+            env.close()
+        demo_episode()
+
+    if profile_enabled:
+        with cProfile.Profile() as pr:
+            rollout()
+        stats = pstats.Stats(pr)
+        stats.sort_stats("cumtime").print_stats(40)
+    else:
+        rollout()
     
     display_learning(rewards)
+    agent.save(model_path)
 
 
 def display_learning(rewards):
@@ -160,4 +140,12 @@ def display_learning(rewards):
 
 
 if __name__ == "__main__":
-    main()
+    args = build_parser().parse_args()
+    main(
+        profile_enabled=args.profile,
+        model_path=Path(args.model_path),
+        fresh=args.fresh,
+        eval_only=args.eval_only,
+        demos_per_run=args.demos_per_run,
+        total_episodes=args.episodes,
+    )
